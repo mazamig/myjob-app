@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>MyJobs v2 — Applications & Quick Apply</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0f2e2e; --ink-2:#2f4f4f;
+    --bg:#f6fbfa; --card:#fff;
+    --brand:#2ab3a6; --brand-2:#198f85;
+    --muted:#6e7f7f; --line:#e6efee;
+    --warn:#f39c12; --ok:#16a34a; --bad:#e11d48;
+    --radius:14px; --shadow:0 6px 20px rgba(16,75,75,.08);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,Helvetica,sans-serif;color:var(--ink);background:var(--bg)}
+  .app{display:grid;grid-template-columns:280px 1fr;min-height:100vh}
+  aside{background:#e8f7f4;padding:22px 18px;border-right:1px solid var(--line)}
+  .brand{display:flex;gap:10px;align-items:center;margin:4px 0 18px}
+  .brand .logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--brand),#7ce2d9);display:grid;place-items:center;color:#fff;font-weight:700}
+  .brand h1{font-size:18px;margin:0}
+  nav{display:flex;flex-direction:column;gap:6px}
+  .nav-btn{display:flex;gap:10px;align-items:center;padding:10px 12px;border-radius:10px;color:var(--ink-2);text-decoration:none;border:1px solid transparent;cursor:pointer}
+  .nav-btn.active,.nav-btn:hover{background:#fff;border-color:var(--line)}
+  .nav-btn svg{width:18px;height:18px;color:var(--brand-2)}
+  main{padding:26px 28px}
+  header.top{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:18px}
+  .searchbar{display:flex;gap:10px;flex:1;background:#fff;border:1px solid var(--line);border-radius:999px;padding:8px 12px}
+  .searchbar input{flex:1;border:none;outline:0;font-size:14px}
+  .btn{display:inline-flex;gap:8px;align-items:center;border:none;cursor:pointer;padding:10px 14px;border-radius:10px;font-weight:600;transition:.2s}
+  .btn.primary{background:var(--brand);color:#fff}.btn.primary:hover{background:var(--brand-2)}
+  .btn.ghost{background:#fff;border:1px solid var(--line);color:var(--ink-2)}
+  .btn.small{padding:6px 10px;font-size:12px}
+  .btn.small.danger{background:#fff0f3;border:1px solid #ffd6df;color:#b91c1c}
+  .file-picker{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px}
+  .file-name{font-size:12px;color:var(--muted)}
+  .file-name strong{color:var(--ink-2)}
+  .grid{display:grid;gap:16px}
+  .filters{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end}
+  .filters label{font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+  .filters label span{font-size:12px;font-weight:600;color:var(--ink-2);letter-spacing:.02em}
+  .filters select{min-width:160px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;color:var(--ink-2)}
+  .column-filter{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:#fff;color:var(--ink-2)}
+  #appsTable thead tr.header-row th[data-key]{cursor:pointer;user-select:none;position:relative}
+  #appsTable thead tr.header-row th.filter-open{color:var(--brand-2)}
+  #appsTable thead tr.header-row th.filter-active::after{content:'\2022';color:var(--brand-2);margin-left:4px;font-size:12px;vertical-align:middle}
+  #appsTable thead tr.filters-row th{background:#f0fbf9;padding:6px 8px}
+  #appsTable thead tr.filters-row th.inactive{background:transparent;padding:0;height:0}
+  #appsTable thead tr.filters-row th.inactive .column-filter{display:none}
+  #appsTable thead tr.filters-row th select.column-filter{padding-right:28px}
+  .cols-2{grid-template-columns:1fr 1fr}.cols-3{grid-template-columns:repeat(3,1fr)}.cols-4{grid-template-columns:repeat(4,1fr)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}
+  .card h3{margin:0 0 10px;font-size:16px}
+  .muted{color:var(--muted)}
+  .kpi{display:flex;gap:12px;flex-wrap:wrap}
+  .pill{display:inline-flex;gap:8px;align-items:center;padding:6px 10px;border-radius:999px;font-size:12px;background:#f0fbf9;color:var(--brand-2);border:1px solid var(--line)}
+  table{width:100%;border-collapse:collapse}
+  th,td{padding:10px 8px;border-bottom:1px solid var(--line);font-size:14px;vertical-align:top}
+  th{text-align:left;color:var(--muted);font-weight:600}
+  tr:hover td{background:#fbfefe}
+  a.link{color:var(--brand-2);text-decoration:none} a.link:hover{text-decoration:underline}
+  .tag{display:inline-block;padding:3px 8px;font-size:12px;border-radius:999px;background:#eef8f7;color:#106e67;margin-right:6px}
+  .status{font-weight:600}
+  .status.Saved{color:#334155}.status.Applied{color:#0369a1}.status.Interviewing{color:#a16207}.status.Offer{color:#16a34a}.status.Rejected{color:#e11d48}
+  .kanban{display:grid;gap:12px;grid-template-columns:repeat(5,1fr)}
+  .col{background:#f8fcfb;border:1px dashed #d8ecea;border-radius:12px;padding:10px;min-height:260px}
+  .col h4{margin:0 0 8px;font-size:13px;color:var(--muted)}
+  .card.small{padding:10px;border-radius:12px;margin-bottom:8px;cursor:grab}
+  .small .row{display:flex;justify-content:space-between;gap:8px}
+  .small .title{font-weight:600}.small .meta{font-size:12px;color:var(--muted)}
+  .form{display:grid;gap:10px}
+  .form label{font-size:13px;color:#264b4a}
+  .form input,.form select,.form textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:14px;background:#fff}
+  .row{display:grid;gap:10px;grid-template-columns:1fr 1fr}
+  .row-3{display:grid;gap:10px;grid-template-columns:1fr 1fr 1fr}
+  .help{font-size:12px;color:var(--muted)}
+  .modal{position:fixed;inset:0;background:rgba(7,40,40,.35);display:none;align-items:center;justify-content:center;padding:20px;z-index:9}
+  .modal .panel{max-width:760px;width:100%;background:#fff;border-radius:16px;padding:16px;box-shadow:var(--shadow)}
+  .close-x{border:none;background:transparent;font-size:20px;cursor:pointer;color:#4b5;float:right}
+  @media (max-width:1024px){
+    .app{grid-template-columns:1fr} aside{display:none}
+    .cols-3,.cols-4{grid-template-columns:1fr}
+    .kanban{grid-template-columns:1fr}
+    .row,.row-3{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <div class="brand"><div class="logo">MJ</div><h1>MyJobs</h1></div>
+    <nav>
+      <a class="nav-btn active" data-view="dashboard">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M3 9.5 12 3l9 6.5V21a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1V9.5z" stroke="currentColor" stroke-width="1.5"/></svg>Dashboard</a>
+      <a class="nav-btn" data-view="applications">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Applications</a>
+      <a class="nav-btn" data-view="kanban">
+        <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="6" height="16" rx="2" stroke="currentColor" stroke-width="1.5"/><rect x="10" y="4" width="11" height="8" rx="2" stroke="currentColor" stroke-width="1.5"/><rect x="10" y="13" width="11" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/></svg>Pipeline</a>
+      <a class="nav-btn" data-view="search">
+        <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M20 20l-3.5-3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Job Search</a>
+      <a class="nav-btn" data-view="profile">
+        <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.5"/><path d="M5 21a7 7 0 0 1 14 0" stroke="currentColor" stroke-width="1.5"/></svg>Quick Apply Profile</a>
+      <a class="nav-btn" data-view="preferences">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.5"/></svg>Work Preferences</a>
+      <a class="nav-btn" data-view="settings">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" stroke="currentColor" stroke-width="1.5"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.13a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06A2 2 0 1 1 4.2 19.7l.06-.06a1.65 1.65 0 0 0 .33-1.82A1.65 1.65 0 0 0 3.1 16H3a2 2 0 1 1 0-4h.13a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06A2 2 0 1 1 7.1 2.33l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V1a2 2 0 1 1 4 0v.13a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06A2 2 0 1 1 21.67 7.1l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c0 .66.39 1.26 1 1.51.13.06.26.1.4.12h.32a2 2 0 1 1 0 4h-.13a1.65 1.65 0 0 0-1.51 1z" stroke="currentColor" stroke-width="1.2"/></svg>Settings & Backup</a>
+    </nav>
+  </aside>
+
+  <main>
+    <header class="top">
+      <div class="searchbar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#1f6f6a" stroke-width="1.5"/><path d="M20 20l-3.5-3.5" stroke="#1f6f6a" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <input id="globalSearch" placeholder="Search applications by company, role, location, status…"/>
+      </div>
+      <button class="btn ghost" id="toggleViewBtn">Switch to Kanban</button>
+      <button class="btn primary" id="newAppBtn">+ Add Application</button>
+    </header>
+
+    <!-- Dashboard -->
+    <section id="view-dashboard" class="grid cols-3">
+      <div class="card">
+        <h3>Active applications</h3>
+        <div class="kpi" id="kpiRow"></div>
+        <p class="help">Track progress across stages. Use <b>Pipeline</b> to drag cards between stages.</p>
+      </div>
+      <div class="card">
+        <h3>Saved searches</h3>
+        <div id="savedSearches"></div>
+        <button class="btn ghost" onclick="ui.go('search')">Create search</button>
+      </div>
+      <div class="card">
+        <h3>Automation links</h3>
+        <p class="help">Generate bookmarklets for quick form autofill and saving jobs from Greenhouse/Lever pages.</p>
+        <div id="bookmarkletArea"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+          <button class="btn primary" onclick="makeBookmarklet()">Autofill bookmarklet</button>
+          <button class="btn ghost" onclick="makeCaptureBookmarklet()">Capture bookmarklet</button>
+        </div>
+      </div>
+      <div class="card cols-3 grid" style="grid-column:1/-1">
+        <div><h3>Quick tips</h3>
+          <ul class="help">
+            <li>Use <b>Export</b> in Settings to back up data.</li>
+            <li>Add “Next step date” to plan follow-ups.</li>
+            <li>Use <b>tags</b> (comma-separated) for easy filtering.</li>
+          </ul>
+        </div>
+        <div><h3>Recently added</h3><div id="recentList" class="help"></div></div>
+        <div><h3>Profile completeness</h3><div id="profileScore" class="help"></div></div>
+      </div>
+    </section>
+
+    <!-- Applications table -->
+    <section id="view-applications" class="card" style="display:none">
+      <h3>Applications</h3>
+      <div class="filters">
+        <label>
+          <span>Status</span>
+          <select id="statusFilter">
+            <option value="">All statuses</option>
+          </select>
+        </label>
+        <label>
+          <span>Tags</span>
+          <select id="tagFilter">
+            <option value="">All tags</option>
+          </select>
+        </label>
+        <button class="btn ghost" type="button" id="clearFiltersBtn">Clear filters</button>
+      </div>
+      <div style="overflow:auto">
+        <table id="appsTable"><thead>
+          <tr class="header-row">
+            <th data-key="role">Role</th><th data-key="company">Company</th><th data-key="location">Location</th><th data-key="status">Status</th><th data-key="applied">Applied</th><th data-key="next">Next step</th><th data-key="source">Source</th><th data-key="tags">Tags</th><th data-key="actions">Actions</th>
+          </tr>
+          <tr class="filters-row">
+            <th data-key="role" class="filter-cell inactive"><input type="text" class="column-filter" data-key="role" placeholder="Filter role"></th>
+            <th data-key="company" class="filter-cell inactive"><input type="text" class="column-filter" data-key="company" placeholder="Filter company"></th>
+            <th data-key="location" class="filter-cell inactive"><input type="text" class="column-filter" data-key="location" placeholder="Filter location"></th>
+            <th data-key="status" class="filter-cell inactive"><select class="column-filter" data-key="status" id="statusColumnFilter"><option value="">Any</option></select></th>
+            <th data-key="applied" class="filter-cell inactive"><input type="text" class="column-filter" data-key="applied" placeholder="Filter date"></th>
+            <th data-key="next" class="filter-cell inactive"><input type="text" class="column-filter" data-key="next" placeholder="Filter next step"></th>
+            <th data-key="source" class="filter-cell inactive"><input type="text" class="column-filter" data-key="source" placeholder="Filter source"></th>
+            <th data-key="tags" class="filter-cell inactive"><input type="text" class="column-filter" data-key="tags" placeholder="Filter tags"></th>
+            <th data-key="actions" class="filter-cell inactive"><select class="column-filter" data-key="actions"><option value="">Any</option><option value="job">Has job link</option><option value="resume">Has resume</option><option value="no-resume">Missing resume</option></select></th>
+          </tr>
+        </thead><tbody></tbody></table>
+      </div>
+    </section>
+
+    <!-- Kanban -->
+    <section id="view-kanban" class="kanban" style="display:none"></section>
+
+    <!-- Job Search -->
+    <section id="view-search" class="grid cols-2" style="display:none">
+      <div class="card">
+        <h3>Find jobs</h3>
+        <form class="form" onsubmit="return runSearch(event)">
+          <div class="row">
+            <div><label>Title / Keywords</label><input id="q" placeholder='e.g., "Process Engineer", "Battery Testing"'></div>
+            <div><label>Location</label><input id="loc" placeholder="e.g., Independence, OH"></div>
+          </div>
+          <div class="row">
+            <div>
+              <label>Sites</label>
+              <select id="sites" multiple>
+                <option selected>Google Jobs</option><option selected>LinkedIn</option><option selected>Indeed</option>
+                <option>Greenhouse</option><option>Lever</option>
+              </select>
+              <div class="help">Hold Ctrl/⌘ for multi-select.</div>
+            </div>
+            <div><label>Save as</label><input id="searchName" placeholder="e.g., Battery/Ohio"></div>
+          </div>
+          <button class="btn primary" type="submit">Open results</button>
+        </form>
+      </div>
+      <div class="card">
+        <h3>Saved searches</h3>
+        <div id="savedSearches2"></div>
+      </div>
+      <div class="card" style="grid-column:1/-1">
+        <h3>Add job manually</h3>
+        <form class="form" onsubmit="return addFromSearch(event)">
+          <div class="row-3">
+            <input id="sRole" placeholder="Role" required>
+            <input id="sCompany" placeholder="Company" required>
+            <input id="sLocation" placeholder="Location">
+          </div>
+          <div class="row-3">
+            <input id="sLink" placeholder="Job link (URL)">
+            <input id="sSource" placeholder="Source (LinkedIn, GH, etc)">
+            <select id="sStatus"><option>Saved</option><option>Applied</option><option>Interviewing</option><option>Offer</option><option>Rejected</option></select>
+          </div>
+          <textarea id="sNotes" rows="2" placeholder="Notes / recruiter / comp"></textarea>
+          <button class="btn ghost" type="submit">Add to Applications</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Profile -->
+    <section id="view-profile" class="grid cols-2" style="display:none">
+      <div class="card">
+        <h3>Quick Apply profile</h3>
+        <form id="profileForm" class="form">
+          <div class="row"><div><label>First name</label><input name="firstName" required></div><div><label>Last name</label><input name="lastName" required></div></div>
+          <div class="row"><div><label>Email</label><input type="email" name="email" required></div><div><label>Phone</label><input name="phone" placeholder="(###) ###-####"></div></div>
+          <div class="row"><div><label>City</label><input name="city"></div><div><label>State</label><input name="state"></div></div>
+          <div class="row"><div><label>Country</label><input name="country"></div><div><label>Preferred name</label><input name="preferred"></div></div>
+          <div class="row"><div><label>LinkedIn</label><input name="linkedin" placeholder="https://..."></div><div><label>Portfolio / Website</label><input name="portfolio" placeholder="https://..."></div></div>
+          <div class="row"><div><label>GitHub</label><input name="github" placeholder="https://..."></div><div><label>Resume URL</label><input name="resumeUrl" placeholder="Link to Google Drive/Dropbox"></div></div>
+          <label>Headline / Role</label><input name="title" placeholder="e.g., Process/Cell Engineer • Supply Chain Technical Analyst">
+          <label>Summary</label><textarea name="summary" rows="3" placeholder="2–3 lines about you"></textarea>
+          <button class="btn primary" type="submit">Save profile</button>
+        </form>
+      </div>
+      <div class="card">
+        <h3>Education & Experience (compact)</h3>
+        <form id="eduForm" class="form">
+          <label>Education</label>
+          <input name="education" placeholder="Clemson University — Ph.D., Discipline; Sharif University — M.S., Discipline">
+          <div class="row"><input name="exp1" placeholder="Company — Title (dates)"><input name="exp2" placeholder="Company — Title (dates)"></div>
+          <input name="exp3" placeholder="Company — Title (dates)">
+          <button class="btn ghost" type="submit">Save section</button>
+        </form>
+        <div class="help" style="margin-top:8px">These fields are embedded into the bookmarklet payload.</div>
+      </div>
+      <div class="card" style="grid-column:1/-1">
+        <h3>Work Authorization & EEO</h3>
+        <form id="eeoForm" class="form">
+          <div class="row">
+            <div>
+              <label>Eligible to work in the United States?</label>
+              <select name="eligibleUS"><option>Yes</option><option>No</option></select>
+            </div>
+            <div>
+              <label>Require future sponsorship?</label>
+              <select name="sponsorshipFuture"><option>No</option><option>Yes</option></select>
+            </div>
+          </div>
+          <div class="row"><input name="basis" placeholder="If Yes to both: basis of work authorization"><input name="basisExpiry" placeholder="Basis expiry (optional)"></div>
+          <div class="row"><input name="immigrationStatus" placeholder="If No to Q1 and Yes to Q2: status"><input name="immigrationExpiry" placeholder="Status expiry (optional)"></div>
+          <div class="row">
+            <div><label>Gender</label><select name="gender"><option>Male</option><option>Female</option><option>Prefer not to say</option></select></div>
+            <div><label>Hispanic or Latino?</label><select name="hispanicOrLatino"><option>No</option><option>Yes</option><option>Prefer not to say</option></select></div>
+          </div>
+          <div class="row">
+            <div><label>Race</label><select name="race"><option>White</option><option>Black or African American</option><option>Asian</option><option>Native Hawaiian or Other Pacific Islander</option><option>American Indian or Alaska Native</option><option>Two or more races</option><option>Prefer not to say</option></select></div>
+            <div><label>Veteran status</label><select name="veteranStatus"><option>I am not a protected veteran</option><option>I am a protected veteran</option><option>Prefer not to say</option></select></div>
+          </div>
+          <div><label>Disability status</label>
+            <select name="disabilityStatus">
+              <option>No, I do not have a disability and have not had one in the past</option>
+              <option>Yes, I have a disability</option>
+              <option>Prefer not to say</option>
+            </select>
+          </div>
+          <button class="btn ghost" type="submit">Save Work Auth & EEO</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Preferences -->
+    <section id="view-preferences" class="grid cols-2" style="display:none">
+      <div class="card">
+        <h3>Work preferences</h3>
+        <form id="prefForm" class="form">
+          <label>Languages (comma separated)</label><input name="languages" placeholder="English, Spanish">
+          <label>Employment Types</label><select name="employment" multiple><option selected>Full-time</option><option>Contract</option><option>Part-time</option><option>Intern</option></select>
+          <label>Worksites</label><select name="worksites" multiple><option selected>On-site</option><option selected>Hybrid</option><option selected>Remote</option></select>
+          <label>Preferred locations</label><input name="locations" placeholder="e.g., Independence OH; Orlando FL">
+          <label><input type="checkbox" name="relocate"> I am willing to relocate</label>
+          <button class="btn primary" type="submit">Save preferences</button>
+        </form>
+      </div>
+      <div class="card">
+        <h3>What preferences do</h3>
+        <ul class="help"><li>Tag new applications with target locations.</li><li>Pre-select Job Search filters.</li><li>Boost profile completeness.</li></ul>
+      </div>
+    </section>
+
+    <!-- Settings -->
+    <section id="view-settings" class="grid cols-2" style="display:none">
+      <div class="card">
+        <h3>Backup & restore</h3>
+        <div class="form">
+          <button class="btn ghost" onclick="exportJSON()">Export JSON</button>
+          <input id="importFile" type="file" accept=".json"/><button class="btn ghost" onclick="importJSON()">Import JSON</button>
+        </div>
+        <hr style="border:none;border-top:1px solid var(--line);margin:14px 0">
+        <h3>CSV export (applications)</h3><button class="btn ghost" onclick="exportCSV()">Download CSV</button>
+      </div>
+      <div class="card">
+        <h3>Danger zone</h3>
+        <button class="btn" style="background:#fee2e2;color:#7f1d1d" onclick="if(confirm('Clear ALL data?')){clearStoredState();location.reload()}">Clear all data</button>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Add/Edit Application Modal -->
+<div id="appModal" class="modal"><div class="panel">
+  <button class="close-x" onclick="closeModal()">&times;</button>
+  <h3 id="modalTitle">Add application</h3>
+  <form id="appForm" class="form" onsubmit="return saveApplication(event)">
+    <input type="hidden" name="id">
+    <div class="row-3">
+      <div><label>Role</label><input name="role" required></div>
+      <div><label>Company</label><input name="company" required></div>
+      <div><label>Location</label><input name="location"></div>
+    </div>
+    <div class="row-3">
+      <div><label>Status</label><select name="status"><option>Saved</option><option>Applied</option><option>Interviewing</option><option>Offer</option><option>Rejected</option></select></div>
+      <div><label>Date applied</label><input type="date" name="applied"></div>
+      <div><label>Next step date</label><input type="date" name="next"></div>
+    </div>
+    <div class="row-3">
+      <div><label>Source</label><input name="source" placeholder="LinkedIn / Greenhouse / Referral"></div>
+      <div><label>Job link</label><input name="link" placeholder="https://..."></div>
+      <div>
+        <label>Resume link used</label>
+        <input type="url" name="resumeUrl" placeholder="http://localhost:8000/resume/YourResume.pdf">
+        <div class="file-picker">
+          <button class="btn ghost small" type="button" id="resumeFileBtn">Attach file</button>
+          <span class="file-name" id="resumeFileName">No file selected</span>
+          <button class="btn small danger" type="button" id="resumeFileClearBtn" style="display:none">Remove</button>
+        </div>
+        <input type="file" id="resumeFileInput" accept=".pdf,.doc,.docx,.txt,.rtf,.png,.jpg,.jpeg" style="display:none">
+      </div>
+    </div>
+    <div><label>Tags</label><input name="tags" placeholder="comma,separated"></div>
+    <label>Notes</label><textarea name="notes" rows="3" placeholder="Recruiter, pay range, reminders…"></textarea>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn ghost" type="button" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" type="submit">Save</button>
+    </div>
+  </form>
+</div></div>
+
+<script>
+/* =========================== Data & Storage (v2) =========================== */
+const APP_VERSION = 2;
+// Reuse this tab for captures
+try {
+  if (window.name !== 'MyJobs v2') window.name = 'MyJobs v2';
+} catch (_) {}
+
+
+// ---------- Default State (Milad) ----------
+const defaultState = {
+  _v: APP_VERSION,
+  profile:{
+    firstName:"Milad", lastName:"Azami Ghadkolai", preferred:"Milad",
+    email:"milad.azami.sut@gmail.com", phone:"(971) 930-3007",
+    city:"Vancouver", state:"Washington", country:"United States",
+    linkedin:"https://www.linkedin.com/in/miladazami/", github:"", portfolio:"", website:"",
+    resumeUrl:'',
+    title:"Process/Cell Engineer • Supply Chain Technical Analyst", summary:"",
+    educations:[
+      {school:"Clemson University", degree:"Doctor of Philosophy (Ph.D.)", discipline:"Material Science and Engineering", start:{month:"January",year:2015}, end:{month:"April",year:2020}},
+      {school:"Sharif University of Technology", degree:"Master's Degree", discipline:"Material Science and Engineering", start:{month:"September",year:2010}, end:{month:"January",year:2013}}
+    ],
+    education:"Clemson University — Ph.D., Material Science and Engineering; Sharif University of Technology — M.S., Material Science and Engineering",
+    employments:[
+      {company:"Intel", title:"Process Engineer", start:{month:"March",year:2022}, end:null, current:true},
+      {company:"Moses Lake Industries", title:"Battery Scientist", start:{month:"December",year:2020}, end:{month:"March",year:2022}, current:false}
+    ],
+    exp1:"Intel — Process Engineer (Mar 2022–Present)",
+    exp2:"Moses Lake Industries — Battery Scientist (Dec 2020–Mar 2022)",
+    exp3:"Reclaim Realty Investments LLC — Owner/Operator",
+    workAuth:{eligibleUS:"Yes", sponsorshipFuture:"No", basis:"", basisExpiry:"", immigrationStatus:"", immigrationExpiry:""},
+    eeo:{gender:"Male", hispanicOrLatino:"No", race:"White", veteranStatus:"I am not a protected veteran", disabilityStatus:"No, I do not have a disability and have not had one in the past"}
+  },
+  prefs:{languages:"English", employment:["Full-time"], worksites:["On-site","Hybrid","Remote"], locations:"Independence OH; Orlando FL; Vancouver WA", relocate:true},
+  searches:[{id:id(), name:"Battery / Ohio", q:"Battery Test Engineer OR Cell Testing", loc:"Ohio", sites:["Google Jobs","LinkedIn","Indeed"], created:Date.now()}],
+  applications:[{id:id(), role:"Cell Testing Engineer", company:"Gotion, Inc.", location:"Independence, OH", status:"Applied", applied:today(), next:"", source:"Greenhouse", link:"", resumeUrl:'', resumeFile:null, tags:["Battery","Testing"], notes:"Submitted via Greenhouse.", created:Date.now()}]
+};
+
+// ---------- Helpers ----------
+function id(){ return 'id_'+Math.random().toString(36).slice(2,9) }
+function today(){ return new Date().toISOString().slice(0,10) }
+const STATUS_ORDER=['Saved','Applied','Interviewing','Offer','Rejected'];
+const columnFilters={role:'',company:'',location:'',status:'',applied:'',next:'',source:'',tags:'',actions:''};
+let currentResumeFile=null;
+const STORAGE_KEY='myjobs';
+const COOKIE_PREFIX='MYJOBS_STATE_';
+const COOKIE_META=COOKIE_PREFIX+'count';
+const COOKIE_MAX_AGE=60*60*24*365;
+const COOKIE_CHUNK_SIZE=3500;
+const COOKIE_MAX_TOTAL=3000;
+let cookieFallbackWarningShown=false;
+
+function encodeStateBase64(str){
+  try{ return btoa(unescape(encodeURIComponent(str))); }catch(e){ console.warn('State encode failed', e); return ''; }
+}
+function decodeStateBase64(b64){
+  try{ return decodeURIComponent(escape(atob(b64))); }catch(e){ console.warn('State decode failed', e); return null; }
+}
+function getCookieValue(name){
+  const parts=(document.cookie||'').split(';');
+  for(const part of parts){
+    const trimmed=part.trim();
+    if(!trimmed) continue;
+    const eqIndex=trimmed.indexOf('=');
+    let key=trimmed; let value='';
+    if(eqIndex>=0){ key=trimmed.slice(0,eqIndex); value=trimmed.slice(eqIndex+1); }
+    if(key===name) return value;
+  }
+  return null;
+}
+function clearStateCookies(){
+  const parts=(document.cookie||'').split(';');
+  for(const part of parts){
+    const name=part.split('=')[0].trim();
+    if(name && name.startsWith(COOKIE_PREFIX)){
+      document.cookie=`${name}=;path=/;expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+    }
+  }
+}
+function loadStateFromCookies(){
+  try{
+    const countStr=getCookieValue(COOKIE_META);
+    const count=parseInt(countStr||'',10);
+    if(!count || count<1) return null;
+    let base64='';
+    for(let i=0;i<count;i++){
+      const chunk=getCookieValue(COOKIE_PREFIX+i);
+      if(!chunk) return null;
+      base64+=chunk;
+    }
+    return decodeStateBase64(base64);
+  }catch(e){
+    console.warn('Failed to load state from cookies', e);
+    return null;
+  }
+}
+function saveStateToCookies(serialized){
+  try{
+    clearStateCookies();
+    const base64=encodeStateBase64(serialized);
+    if(!base64) return true;
+    if(base64.length>COOKIE_MAX_TOTAL){
+      if(!cookieFallbackWarningShown){ console.warn('State too large for cookie fallback; skipping cookie save'); cookieFallbackWarningShown=true; }
+      return false;
+    }
+    const chunk=base64.slice(0, COOKIE_CHUNK_SIZE);
+    document.cookie=`${COOKIE_PREFIX}0=${chunk};path=/;max-age=${COOKIE_MAX_AGE}`;
+    document.cookie=`${COOKIE_META}=1;path=/;max-age=${COOKIE_MAX_AGE}`;
+    return true;
+  }catch(e){
+    console.warn('Failed to persist state cookie', e);
+    return false;
+  }
+}
+function clearStoredState(){
+  try{ localStorage.removeItem(STORAGE_KEY); }catch(_){ }
+  clearStateCookies();
+}
+function persistSerializedState(serialized){
+  let ok=true;
+  try{ localStorage.setItem(STORAGE_KEY, serialized); }catch(e){ console.warn('localStorage save failed', e); ok=false; }
+  saveStateToCookies(serialized);
+  return ok;
+}
+
+function formatDate(s){ if(!s) return ''; const d=new Date(s+'T00:00:00'); return d.toLocaleDateString() }
+const $=(s,r=document)=>r.querySelector(s); const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+
+function ensureApplicationUpgrades(){
+  if(!state || !Array.isArray(state.applications)) return;
+  let updated=false;
+  state.applications=state.applications.map(app=>{
+    if(app && typeof app==='object' && app.resumeFile===undefined){
+      app.resumeFile=null;
+      updated=true;
+    }
+    return app;
+  });
+  if(updated) try{ store.set(state); }catch(_){ }
+}
+
+// Deep merge for schema evolution
+function deepMerge(base, extra){
+  if(Array.isArray(base)) return Array.isArray(extra) ? extra : base;
+  if(base && typeof base==='object'){
+    const out={...base}; for(const k of Object.keys(extra||{})) out[k]=deepMerge(base[k], extra[k]); return out;
+  } return (extra===undefined ? base : extra);
+}
+
+// Resilient store
+const store={
+  get(){
+    try{
+      let raw=null;
+      try{ raw = localStorage.getItem(STORAGE_KEY); }catch(e){ console.warn('localStorage read failed', e); }
+      if(!raw){
+        const cookieRaw = loadStateFromCookies();
+        if(cookieRaw){
+          raw = cookieRaw;
+          persistSerializedState(cookieRaw);
+        }
+      }
+      if(!raw) return defaultState;
+      const saved = JSON.parse(raw);
+      const merged = deepMerge(defaultState, saved||{});
+      if((saved?._v||0) !== APP_VERSION){
+        merged._v = APP_VERSION;
+        persistSerializedState(JSON.stringify(merged));
+      }
+      return merged;
+    }catch(e){
+      console.warn('Resetting corrupted state', e);
+      clearStoredState();
+      return defaultState;
+    }
+  },
+  set(data){
+    try{
+      const serialized = JSON.stringify(data);
+      if(!persistSerializedState(serialized)){
+        alert('Save failed (localStorage).');
+      }
+    }catch(e){
+      alert('Save failed (localStorage).');
+    }
+  }
+};
+
+let state = store.get();
+ensureApplicationUpgrades();
+
+/* =============================== Router/UI =============================== */
+const ui={go(view){
+  $$('.nav-btn').forEach(x=>x.classList.toggle('active', x.dataset.view===view));
+  ['dashboard','applications','kanban','search','profile','preferences','settings'].forEach(v=>{
+    const el=$('#view-'+v);
+    if(!el) return;
+    if(v==='applications') el.style.display = view==='applications'?'block':'none';
+    else if(v==='kanban') el.style.display = view==='kanban'?'grid':'none';
+    else el.style.display = view===v?'grid':'none';
+  });
+  if(view==='applications') renderTable();
+  if(view==='kanban') renderKanban();
+  if(view==='dashboard') renderDashboard();
+  if(view==='search') renderSavedSearches();
+  if(view==='profile'){ loadProfileForms(); loadEEOForm(); }
+  if(view==='preferences') loadPrefForm();
+}};
+$$('.nav-btn').forEach(b=>b.onclick=()=>ui.go(b.dataset.view));
+$('#newAppBtn').onclick=()=>openModal();
+$('#toggleViewBtn').onclick=()=>{
+  const current=$('.nav-btn.active').dataset.view;
+  ui.go(current==='applications'?'kanban':'applications');
+  $('#toggleViewBtn').textContent=current==='applications'?'Switch to Table':'Switch to Kanban';
+};
+$('#globalSearch').addEventListener('input', renderTable);
+const statusFilterEl=$('#statusFilter');
+if(statusFilterEl) statusFilterEl.addEventListener('change', renderTable);
+const tagFilterEl=$('#tagFilter');
+if(tagFilterEl) tagFilterEl.addEventListener('change', renderTable);
+const clearFiltersBtn=$('#clearFiltersBtn');
+if(clearFiltersBtn) clearFiltersBtn.addEventListener('click',()=>{
+  if(statusFilterEl) statusFilterEl.value='';
+  if(tagFilterEl) tagFilterEl.value='';
+  Object.keys(columnFilters).forEach(k=>columnFilters[k]='');
+  $$('#appsTable thead tr.filters-row th.filter-cell').forEach(cell=>{
+    cell.classList.add('inactive');
+    const input=cell.querySelector('.column-filter');
+    if(input) input.value='';
+  });
+  $$('#appsTable thead tr.header-row th[data-key]').forEach(th=>{
+    th.classList.remove('filter-open');
+    th.classList.remove('filter-active');
+  });
+  renderTable();
+});
+
+/* ============================== Dashboard ============================== */
+function renderDashboard(){
+  const counts=STATUS_ORDER.map(s=>({s,n:state.applications.filter(a=>a.status===s).length}));
+  $('#kpiRow').innerHTML=counts.map(({s,n})=>`<span class="pill"><b>${n}</b> ${s}</span>`).join(' ');
+  const latest=[...state.applications].sort((a,b)=>(b.created||0)-(a.created||0)).slice(0,5);
+  $('#recentList').innerHTML=latest.length?latest.map(a=>`<div>• <span class="title">${a.role}</span> @ ${a.company} <span class="muted">(${a.status})</span></div>`).join(''):'<span class="muted">No recent items.</span>';
+  const p=state.profile;
+  const req=['firstName','lastName','email','phone','city','state','country','linkedin','resumeUrl','title','summary'];
+  const filled=req.filter(k=>String(p[k]||'').trim()).length;
+  $('#profileScore').innerHTML=`Profile completeness: <b>${Math.round((filled/req.length)*100)}%</b>`;
+  renderSavedSearches();
+  if(window._lastBookmarklet) $('#bookmarkletArea').innerHTML = window._lastBookmarklet + (window._capBookmarklet||'');
+}
+renderDashboard();
+
+/* ============================ Applications ============================ */
+function updateFilterControls(){
+  const statuses=Array.from(new Set([...STATUS_ORDER, ...state.applications.map(a=>a.status).filter(Boolean)]));
+  const statusSelect=$('#statusFilter');
+  if(statusSelect){
+    const prev=statusSelect.value;
+    statusSelect.innerHTML='<option value="">All statuses</option>'+statuses.map(s=>`<option value="${s}">${s}</option>`).join('');
+    statusSelect.value=statuses.includes(prev)?prev:'';
+  }
+  const statusColumnSelect=$('#statusColumnFilter');
+  if(statusColumnSelect){
+    const previous=columnFilters.status;
+    statusColumnSelect.innerHTML='<option value="">Any</option>'+statuses.map(s=>`<option value="${s}">${s}</option>`).join('');
+    if(previous && statuses.includes(previous)){
+      statusColumnSelect.value=previous;
+    }else{
+      statusColumnSelect.value='';
+      columnFilters.status='';
+    }
+  }
+  const tags=Array.from(new Set(state.applications.flatMap(a=>(a.tags||[])))).filter(Boolean).sort((a,b)=>a.localeCompare(b));
+  const tagSelect=$('#tagFilter');
+  if(tagSelect){
+    const prev=tagSelect.value;
+    tagSelect.innerHTML='<option value="">All tags</option>'+tags.map(t=>`<option value="${t}">${t}</option>`).join('');
+    tagSelect.value=tags.includes(prev)?prev:'';
+  }
+}
+
+function syncHeaderFilterState(){
+  $$('#appsTable thead tr.header-row th[data-key]').forEach(th=>{
+    const key=th.dataset.key;
+    if(!key) return;
+    const cell=$(`#appsTable thead tr.filters-row th[data-key="${key}"]`);
+    const hasValue=Boolean(columnFilters[key]);
+    th.classList.toggle('filter-active', hasValue);
+    th.classList.toggle('filter-open', cell && !cell.classList.contains('inactive'));
+  });
+}
+
+function toggleColumnFilter(key){
+  const cell=$(`#appsTable thead tr.filters-row th[data-key="${key}"]`);
+  const header=$(`#appsTable thead tr.header-row th[data-key="${key}"]`);
+  if(!cell||!header) return;
+  const wasInactive=cell.classList.contains('inactive');
+  if(wasInactive){
+    cell.classList.remove('inactive');
+    header.classList.add('filter-open');
+    const input=cell.querySelector('.column-filter');
+    if(input){
+      input.focus();
+      if(typeof input.select==='function') input.select();
+    }
+  }else{
+    cell.classList.add('inactive');
+    header.classList.remove('filter-open');
+    header.classList.remove('filter-active');
+    const input=cell.querySelector('.column-filter');
+    if(input){
+      input.value='';
+      columnFilters[key]='';
+    }
+    renderTable();
+    return;
+  }
+  syncHeaderFilterState();
+}
+
+function hasResumeAsset(a){
+  if(!a) return false;
+  const url=typeof a.resumeUrl==='string' ? a.resumeUrl.trim() : '';
+  const file=a.resumeFile;
+  return Boolean(url) || Boolean(file && file.data);
+}
+
+function updateResumeFileUI(){
+  const nameEl=$('#resumeFileName');
+  const clearBtn=$('#resumeFileClearBtn');
+  if(!nameEl || !clearBtn) return;
+  if(currentResumeFile && currentResumeFile.name){
+    const size=(typeof currentResumeFile.size==='number')?` (${formatBytes(currentResumeFile.size)})`:'';
+    nameEl.innerHTML=`<strong>${currentResumeFile.name}</strong>${size}`;
+    clearBtn.style.display='inline-flex';
+  }else{
+    nameEl.textContent='No file selected';
+    clearBtn.style.display='none';
+  }
+}
+
+function setupResumeFilePicker(){
+  const input=$('#resumeFileInput');
+  const trigger=$('#resumeFileBtn');
+  const clear=$('#resumeFileClearBtn');
+  if(trigger && input){
+    trigger.addEventListener('click',()=>input.click());
+  }
+  if(clear && input){
+    clear.addEventListener('click',()=>{
+      if(input) input.value='';
+      currentResumeFile=null;
+      updateResumeFileUI();
+    });
+  }
+  if(input){
+    input.addEventListener('change',()=>{
+      const file=input.files && input.files[0];
+      if(!file){
+        currentResumeFile=null;
+        updateResumeFileUI();
+        return;
+      }
+      const reader=new FileReader();
+      reader.onload=()=>{
+        currentResumeFile={ name:file.name, type:file.type||'application/octet-stream', size:file.size, data:reader.result };
+        updateResumeFileUI();
+        if(input) input.value='';
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  updateResumeFileUI();
+}
+
+function formatBytes(bytes){
+  if(bytes===0) return '0 B';
+  if(!bytes) return '';
+  const thresh=1024;
+  if(Math.abs(bytes)<thresh) return `${bytes} B`;
+  const units=['KB','MB','GB','TB'];
+  let u=-1;
+  let value=bytes;
+  do{
+    value/=thresh;
+    ++u;
+  }while(Math.abs(value)>=thresh && u<units.length-1);
+  return `${value.toFixed(1)} ${units[u]}`;
+}
+
+function initColumnFilters(){
+  $$('#appsTable thead tr.header-row th[data-key]').forEach(th=>{
+    th.addEventListener('click',()=>toggleColumnFilter(th.dataset.key));
+  });
+  $$('#appsTable thead tr.filters-row .column-filter').forEach(input=>{
+    const key=input.dataset.key;
+    if(!key) return;
+    const eventName=input.tagName==='SELECT'?'change':'input';
+    input.addEventListener(eventName,()=>{
+      columnFilters[key]=(input.value||'').trim();
+      renderTable();
+    });
+  });
+  syncHeaderFilterState();
+}
+
+function renderTable(){
+  updateFilterControls();
+  const searchInput=$('#globalSearch');
+  const q=(searchInput?searchInput.value:'').toLowerCase();
+  const statusEl=$('#statusFilter');
+  const tagEl=$('#tagFilter');
+  const status=statusEl?statusEl.value:'';
+  const tagValue=tagEl?tagEl.value:'';
+  const tag=tagValue.toLowerCase();
+
+  const filterRole=(columnFilters.role||'').toLowerCase();
+  const filterCompany=(columnFilters.company||'').toLowerCase();
+  const filterLocation=(columnFilters.location||'').toLowerCase();
+  const filterStatus=columnFilters.status||'';
+  const filterApplied=(columnFilters.applied||'').toLowerCase();
+  const filterNext=(columnFilters.next||'').toLowerCase();
+  const filterSource=(columnFilters.source||'').toLowerCase();
+  const filterTags=(columnFilters.tags||'').toLowerCase();
+  const filterActions=columnFilters.actions||'';
+
+  const rows=state.applications
+    .filter(a=>{
+      const haystack=[a.role,a.company,a.location,a.status,(a.tags||[]).join(','),(a.notes||''),a.source,a.resumeUrl,(a.resumeFile&&a.resumeFile.name)||''].join(' ').toLowerCase();
+      return haystack.includes(q);
+    })
+    .filter(a=>!status || (a.status||'')===status)
+    .filter(a=>!tag || (a.tags||[]).some(t=>t.toLowerCase()===tag))
+    .filter(a=>!filterRole || (a.role||'').toLowerCase().includes(filterRole))
+    .filter(a=>!filterCompany || (a.company||'').toLowerCase().includes(filterCompany))
+    .filter(a=>!filterLocation || (a.location||'').toLowerCase().includes(filterLocation))
+    .filter(a=>!filterStatus || (a.status||'')===filterStatus)
+    .filter(a=>!filterApplied || ((a.applied||'').toLowerCase().includes(filterApplied) || formatDate(a.applied).toLowerCase().includes(filterApplied)))
+    .filter(a=>!filterNext || ((a.next||'').toLowerCase().includes(filterNext) || formatDate(a.next).toLowerCase().includes(filterNext)))
+    .filter(a=>!filterSource || (a.source||'').toLowerCase().includes(filterSource))
+    .filter(a=>!filterTags || (a.tags||[]).some(t=>t.toLowerCase().includes(filterTags)))
+    .filter(a=>{
+      if(!filterActions) return true;
+      if(filterActions==='job') return Boolean(a.link);
+      if(filterActions==='resume') return hasResumeAsset(a);
+      if(filterActions==='no-resume') return !hasResumeAsset(a);
+      return true;
+    })
+    .map(a=>{
+      const actionLinks=[];
+      if(a.link) actionLinks.push(`<a href="${a.link}" target="_blank">Job</a>`);
+      if(a.resumeUrl) actionLinks.push(`<a href="${resumeHref(a.resumeUrl)}" target="_blank">Resume link</a>`);
+      if(a.resumeFile && a.resumeFile.data) actionLinks.push(`<a href="${a.resumeFile.data}" download="${a.resumeFile.name||'resume'}">Resume file</a>`);
+      const actionsHTML=actionLinks.join(' | ');
+      const buttonsHTML=`<button class="btn ghost" onclick='editApp("${a.id}")'>Edit</button> | <button class="btn" style="background:#fff0f3;border:1px solid #ffd6df;color:#b91c1c" onclick='delApp("${a.id}")'>Delete</button>`;
+      const prefix=actionsHTML ? actionsHTML + ' | ' : '';
+      return `<tr>
+      <td><a class="link" href="${a.link||'#'}" target="_blank">${a.role||''}</a></td>
+      <td>${a.company||''}</td>
+      <td>${a.location||''}</td>
+      <td class="status ${a.status}">${a.status||''}</td>
+      <td>${formatDate(a.applied)}</td>
+      <td>${formatDate(a.next)}</td>
+      <td>${a.source||''}</td>
+      <td>${(a.tags||[]).map(t=>`<span class="tag">${t}</span>`).join('')}</td>
+      <td style="white-space:nowrap">
+       ${prefix}${buttonsHTML}
+     </td>
+
+    </tr>`;
+    });
+  const body=$('#appsTable tbody');
+  if(body) body.innerHTML=rows.length?rows.join(''):`<tr><td colspan="9" class="muted">No applications match your filters.</td></tr>`;
+  syncHeaderFilterState();
+}
+renderTable();
+function resumeHref(v){
+  if(!v) return '';
+  if(/^https?:\/\//i.test(v)) return v;   // absolute URL
+  return v.startsWith('/') ? v : '/' + v; // relative under localhost
+}
+
+function editApp(id){ openModal(state.applications.find(x=>x.id===id)); }
+function delApp(id){ if(!confirm('Delete this application?'))return; state.applications=state.applications.filter(x=>x.id!==id); store.set(state); renderTable(); renderKanban(); renderDashboard(); }
+
+
+/* ============================== Kanban ============================== */
+function renderKanban(){
+  const cols=STATUS_ORDER;
+  $('#view-kanban').innerHTML=cols.map(s=>`
+    <div class="col" data-col="${s}" ondragover="event.preventDefault()" ondrop="onDrop(event)">
+      <h4>${s} <span class="muted">(${state.applications.filter(a=>a.status===s).length})</span></h4>
+      ${state.applications.filter(a=>a.status===s).map(card).join('')}
+    </div>`).join('');
+}
+function card(a){ return `<div class="card small" draggable="true" ondragstart="onDrag(event,'${a.id}')"><div class="row">
+  <div><div class="title">${a.role}</div><div class="meta">${a.company} • ${a.location||'—'}</div></div>
+  <a class="link" href="${a.link||'#'}" target="_blank">↗</a></div></div>` }
+function onDrag(e,id){ e.dataTransfer.setData('text/plain', id) }
+function onDrop(e){ const id=e.dataTransfer.getData('text/plain'); const col=e.currentTarget.dataset.col; const a=state.applications.find(x=>x.id===id); if(a){ a.status=col; store.set(state); renderKanban(); renderTable(); renderDashboard(); } }
+
+/* ============================== Modal ============================== */
+function openModal(existing=null){
+  $('#modalTitle').textContent=existing?'Edit application':'Add application';
+  const f=$('#appForm'); f.reset();
+  if(existing){ Object.entries(existing).forEach(([k,v])=>{ if(f[k]!==undefined) f[k].value=Array.isArray(v)?v.join(','):(v||''); }); }
+  else{ f.id.value=''; f.applied.value=''; f.next.value=''; }
+  currentResumeFile = existing && existing.resumeFile ? { ...existing.resumeFile } : null;
+  const resumeInput=$('#resumeFileInput'); if(resumeInput) resumeInput.value='';
+  updateResumeFileUI();
+  $('#appModal').style.display='flex';
+}
+function closeModal(){
+  $('#appModal').style.display='none';
+  currentResumeFile=null;
+  const resumeInput=$('#resumeFileInput'); if(resumeInput) resumeInput.value='';
+  updateResumeFileUI();
+}
+function saveApplication(e){
+  e.preventDefault(); const f=e.target;
+  const existingIndex=state.applications.findIndex(x=>x.id===(f.id.value||''));
+  const existing=existingIndex>=0 ? state.applications[existingIndex] : null;
+  const obj={ id:f.id.value||id(), role:f.role.value.trim(), company:f.company.value.trim(), location:f.location.value.trim(),
+    status:f.status.value, applied:f.applied.value, next:f.next.value, source:f.source.value.trim(), link:f.link.value.trim(),
+    resumeUrl:f.resumeUrl.value.trim(), tags:(f.tags.value||'').split(',').map(s=>s.trim()).filter(Boolean), notes:f.notes.value.trim(),
+    created: existing && existing.created ? existing.created : Date.now() };
+  obj.resumeFile = currentResumeFile ? { ...currentResumeFile } : null;
+  if(existingIndex>=0) state.applications[existingIndex]=obj; else state.applications.unshift(obj);
+  store.set(state); closeModal(); renderTable(); renderKanban(); renderDashboard(); return false;
+}
+
+/* =============================== Search =============================== */
+function runSearch(e){
+  e.preventDefault(); const q=$('#q').value.trim(), loc=$('#loc').value.trim();
+  const s=Array.from($('#sites').selectedOptions).map(o=>o.value); const name=$('#searchName').value.trim();
+  if(name){ state.searches.unshift({id:id(), name, q, loc, sites:s, created:Date.now()}); store.set(state); renderSavedSearches(); }
+  openSites(q, loc, s); return false;
+}
+function openSites(q, loc, sites){
+  const enc=encodeURIComponent;
+  const queries={
+    "Google Jobs":`https://www.google.com/search?q=${enc(q)}+jobs+in+${enc(loc)}`,
+    "LinkedIn":`https://www.linkedin.com/jobs/search/?keywords=${enc(q)}&location=${enc(loc)}`,
+    "Indeed":`https://www.indeed.com/jobs?q=${enc(q)}&l=${enc(loc)}`,
+    "Greenhouse":`https://www.google.com/search?q=site%3Agreenhouse.io+${enc(q)}+${enc(loc)}`,
+    "Lever":`https://www.google.com/search?q=site%3Ajobs.lever.co+${enc(q)}+${enc(loc)}`
+  };
+  sites.forEach(site=>window.open(queries[site],'_blank'));
+}
+function renderSavedSearches(){
+  const render=(id)=>{ const el=document.getElementById(id);
+    el.innerHTML = state.searches.length ? state.searches.map(s=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:10px;padding:8px;margin:6px 0">
+        <div><div><b>${s.name}</b> <span class="muted">— ${s.q} • ${s.loc}</span></div><div class="muted" style="font-size:12px">Sites: ${s.sites.join(', ')}</div></div>
+        <div><button class="btn small" type="button" onclick="openSavedSearch('${s.id}')">Open</button>
+        <button class="btn small danger" type="button" onclick="deleteSavedSearch('${s.id}')">Delete</button>
+></div>
+      </div>`).join('') : '<span class="muted">No saved searches yet.</span>';
+  }; render('savedSearches'); render('savedSearches2');
+}
+function delSearch(id){ state.searches=state.searches.filter(x=>x.id!==id); store.set(state); renderSavedSearches(); }
+function addFromSearch(e){
+  e.preventDefault();
+  const a={ id:id(), role:$('#sRole').value.trim(), company:$('#sCompany').value.trim(), location:$('#sLocation').value.trim(),
+    status:$('#sStatus').value, applied:'', next:'', source:$('#sSource').value.trim(), link:$('#sLink').value.trim(),
+    resumeUrl:'', resumeFile:null, tags:[], notes:$('#sNotes').value.trim(), created:Date.now() };
+  state.applications.unshift(a); store.set(state); ui.go('applications'); renderTable(); renderKanban(); renderDashboard(); e.target.reset(); return false;
+}
+
+/* ============================ Profile & Prefs ============================ */
+function loadProfileForms(){
+  const p=state.profile, pf=$('#profileForm'); Object.keys(p).forEach(k=>{ if(pf[k]) pf[k].value=p[k]||''; });
+  const ef=$('#eduForm'); ['education','exp1','exp2','exp3'].forEach(k=>ef[k].value=p[k]||'');
+}
+$('#profileForm').onsubmit=(e)=>{ e.preventDefault(); Object.assign(state.profile, Object.fromEntries(new FormData(e.target).entries())); store.set(state); alert('Profile saved.'); renderDashboard(); };
+$('#eduForm').onsubmit=(e)=>{ e.preventDefault(); Object.assign(state.profile, Object.fromEntries(new FormData(e.target).entries())); store.set(state); alert('Education & experience saved.'); };
+
+function loadEEOForm(){
+  const p=state.profile, w=p.workAuth||{}, eeo=p.eeo||{}, f=$('#eeoForm');
+  f.eligibleUS.value=w.eligibleUS||'Yes'; f.sponsorshipFuture.value=w.sponsorshipFuture||'No';
+  f.basis.value=w.basis||''; f.basisExpiry.value=w.basisExpiry||'';
+  f.immigrationStatus.value=w.immigrationStatus||''; f.immigrationExpiry.value=w.immigrationExpiry||'';
+  f.gender.value=eeo.gender||'Male'; f.hispanicOrLatino.value=eeo.hispanicOrLatino||'No'; f.race.value=eeo.race||'White';
+  f.veteranStatus.value=eeo.veteranStatus||'I am not a protected veteran'; f.disabilityStatus.value=eeo.disabilityStatus||'No, I do not have a disability and have not had one in the past';
+}
+$('#eeoForm').onsubmit=(e)=>{ e.preventDefault(); const d=Object.fromEntries(new FormData(e.target).entries());
+  state.profile.workAuth={eligibleUS:d.eligibleUS, sponsorshipFuture:d.sponsorshipFuture, basis:d.basis, basisExpiry:d.basisExpiry, immigrationStatus:d.immigrationStatus, immigrationExpiry:d.immigrationExpiry};
+  state.profile.eeo={gender:d.gender, hispanicOrLatino:d.hispanicOrLatino, race:d.race, veteranStatus:d.veteranStatus, disabilityStatus:d.disabilityStatus};
+  store.set(state); alert('Work Auth & EEO saved.');
+};
+
+function loadPrefForm(){
+  const p=state.prefs, f=$('#prefForm');
+  f.languages.value=p.languages||''; Array.from(f.employment.options).forEach(o=>o.selected=(p.employment||[]).includes(o.value));
+  Array.from(f.worksites.options).forEach(o=>o.selected=(p.worksites||[]).includes(o.value));
+  f.locations.value=p.locations||''; f.relocate.checked=!!p.relocate;
+}
+$('#prefForm').onsubmit=(e)=>{ e.preventDefault(); const f=e.target;
+  state.prefs={ languages:f.languages.value.trim(), employment:Array.from(f.employment.selectedOptions).map(o=>o.value),
+    worksites:Array.from(f.worksites.selectedOptions).map(o=>o.value), locations:f.locations.value.trim(), relocate:f.relocate.checked };
+  store.set(state); alert('Preferences saved.');
+};
+
+/* ============================ Bookmarklets ============================ */
+// UNIVERSAL AUTOFILL (works across most sites; includes ATS adapters)
+function makeBookmarklet(){
+  const p = state.profile;
+  const payload = {
+    firstName:p.firstName||'', lastName:p.lastName||'', preferred:p.preferred||'',
+    email:p.email||'', phone:p.phone||'',
+    city:p.city||'', state:p.state||'', country:p.country||'',
+    linkedin:p.linkedin||'', github:p.github||'',
+    portfolio:p.portfolio||p.website||'',
+    resumeUrl:p.resumeUrl||'',
+    title:p.title||'', summary:p.summary||'',
+    education:p.education||'', exp1:p.exp1||'', exp2:p.exp2||'', exp3:p.exp3||'',
+    workAuth:p.workAuth||{}, eeo:p.eeo||{}
+  };
+
+  const code = `(function(d,p){
+    function setVal(el, v){
+      if(!el) return;
+      if(el.type==='checkbox'){ el.checked = !!v; }
+      else if(el.type==='radio'){ if(String(el.value).toLowerCase().includes(String(v).toLowerCase())) el.checked = true; }
+      else if(el.tagName==='SELECT'){
+        const vv=String(v).toLowerCase();
+        for(const opt of el.options){ if(opt.textContent.toLowerCase().includes(vv)||String(opt.value).toLowerCase().includes(vv)){ el.value = opt.value; break; } }
+      } else { el.value = v; }
+      el.dispatchEvent(new Event('input',{bubbles:true}));
+      el.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+    function Q(q){ return Array.from(d.querySelectorAll(q)); }
+    function fillByHints(v, hints){
+      const sels=[];
+      hints.forEach(h=>{
+        const t=h.toLowerCase();
+        sels.push(
+          'input[name*="'+t+'" i]','input[id*="'+t+'" i]','input[aria-label*="'+t+'"'+' i]',
+          'input[placeholder*="'+t+'"'+' i]','textarea[name*="'+t+'"'+' i]','textarea[placeholder*="'+t+'"'+' i]',
+          'select[name*="'+t+'"'+' i]','select[id*="'+t+'"'+' i]'
+        );
+        // via <label>
+        Q('label').forEach(lb=>{
+          if((lb.textContent||'').toLowerCase().includes(t)){
+            const forId = lb.getAttribute('for');
+            if(forId){ const el = d.getElementById(forId); if(el) setVal(el, v); }
+            else {
+              const el = lb.querySelector('input,select,textarea') || lb.nextElementSibling && lb.nextElementSibling.querySelector && lb.nextElementSibling.querySelector('input,select,textarea');
+              if(el) setVal(el, v);
+            }
+          }
+        });
+      });
+      Q(sels.join(',')).forEach(el=>setVal(el,v));
+    }
+
+    // ---------- Domain adapters (extra selectors for common ATS) ----------
+    const host = location.hostname;
+    const is = (s)=>host.includes(s);
+
+    function fillCommon(){
+      fillByHints(p.firstName, ['first','given']);
+      fillByHints(p.lastName,  ['last','family','surname']);
+      fillByHints(p.preferred, ['preferred','nickname']);
+      fillByHints(p.email,     ['email']);
+      fillByHints(p.phone,     ['phone','mobile','tel']);
+      fillByHints(p.city,      ['city','location']);
+      fillByHints(p.state,     ['state','region','province']);
+      fillByHints(p.country,   ['country']);
+      fillByHints(p.linkedin,  ['linkedin']);
+      fillByHints(p.github,    ['github']);
+      fillByHints(p.portfolio, ['portfolio','website','url','homepage']);
+      fillByHints(p.resumeUrl, ['resume','cv','attachment','link','url']);
+      fillByHints(p.title,     ['headline','current title','role']);
+      fillByHints(p.summary,   ['summary','about','cover note']);
+      fillByHints(p.education, ['education']);
+      fillByHints(p.exp1,      ['experience','employment']);
+      fillByHints(p.exp2,      ['experience2']);
+      fillByHints(p.exp3,      ['experience3']);
+      // Work Authorization + EEO (best-effort)
+      if(p.workAuth){ fillByHints(p.workAuth.eligibleUS,['eligible to work','work in the united states','work authorization']); fillByHints(p.workAuth.sponsorshipFuture,['sponsorship','require sponsorship']); }
+      if(p.eeo){
+        fillByHints(p.eeo.gender,['gender']);
+        fillByHints(p.eeo.hispanicOrLatino,['hispanic']);
+        fillByHints(p.eeo.race,['race','ethnicity']);
+        fillByHints(p.eeo.veteranStatus,['veteran']);
+        fillByHints(p.eeo.disabilityStatus,['disability']);
+      }
+    }
+
+    // Workday
+    function workday(){
+      // names often live under data-automation-id fields
+      const map = [
+        ['[data-automation-id="legalNameSection_firstName"] input', p.firstName],
+        ['[data-automation-id="legalNameSection_lastName"]  input', p.lastName],
+        ['input[data-automation-id="email"]', p.email],
+        ['input[data-automation-id="phone-number"]', p.phone],
+      ];
+      map.forEach(([sel,val])=>Q(sel).forEach(el=>setVal(el,val)));
+    }
+    // Lever
+    function lever(){
+      const map = [
+        ['input[name="name"]', (p.firstName+' '+p.lastName).trim()],
+        ['input[name="email"]', p.email],
+        ['input[name="phone"]', p.phone],
+        ['input[name="org"]',  ''],
+        ['input[name="urls[LinkedIn]"]', p.linkedin],
+        ['input[name="urls[Portfolio]"], input[name="urls[Website]"]', p.portfolio||p.website]
+      ];
+      map.forEach(([sel,val])=>Q(sel).forEach(el=>setVal(el,val)));
+    }
+    // Greenhouse (extra helper to expose "Enter manually" URL for resume)
+    function greenhouse(){
+      try{
+        var btn = Array.from(d.querySelectorAll('button,a')).find(b=>/enter manually/i.test(b.textContent));
+        if(btn){ btn.click(); setTimeout(()=>{ var urlInput = d.querySelector('input[type="url"], input[name*="resume" i]'); if(urlInput&&p.resumeUrl){ setVal(urlInput,p.resumeUrl); }}, 400); }
+      }catch(_){}
+    }
+
+    fillCommon();
+    if(is('workday')) workday();
+    if(is('lever.co')) lever();
+    if(is('greenhouse.io')||/boards\\.greenhouse\\.io/.test(host)) greenhouse();
+
+    alert('Autofill attempted — please review before submitting.');
+  })(document,${JSON.stringify(payload)});`;
+
+  const href = 'javascript:' + encodeURIComponent(code);
+  const html = `<div style="margin-top:6px"><a class="link" href="${href}">▶ MyJobs Autofill (any site — drag to bookmarks)</a></div>`;
+  window._lastBookmarklet = html;
+  const container = document.getElementById('bookmarkletArea');
+  if(container) container.innerHTML = html + (window._capBookmarklet||'');
+}
+
+function makeCaptureBookmarklet(){
+  // This is your app URL baked into the bookmarklet as a fallback:
+  const FALLBACK_APP_URL = location.origin + location.pathname; // e.g. http://localhost:8000/myjobs.html
+
+  const code = `(function(){
+    function clean(s){return (s||'').toString().trim();}
+
+    // --------- Resolve base (never rely only on page localStorage) ----------
+    // Try to read a user-set value; if absent (different origin), use baked fallback.
+    const stored = (function(){
+      try { return localStorage.getItem('myjobs_app_url'); } catch(_) { return null; }
+    })();
+    const base = (stored && /^https?:\\/\\//.test(stored) ? stored : '${FALLBACK_APP_URL}').replace(/[#?].*$/,'');
+    try{ localStorage.setItem('myjobs_app_url', base); }catch(_){ }
+
+    // ---- LinkedIn adapter (new UI) ----
+    function fromLinkedIn(){
+      const out = {};
+      out.role =
+        document.querySelector('.jobs-unified-top-card__job-title, h1')?.innerText?.trim() ||
+        document.querySelector('h1')?.innerText?.trim() || '';
+      out.company =
+        document.querySelector('.job-details-jobs-unified-top-card__company-name a')?.innerText?.trim() ||
+        document.querySelector('.job-details-jobs-unified-top-card__company-name')?.innerText?.trim() || '';
+      out.location =
+        document.querySelector('.job-details-jobs-unified-top-card__bullet')?.innerText?.trim() || '';
+      if(out.role || out.company || out.location) return out;
+      return null;
+    }
+
+    // ---- JSON-LD JobPosting ----
+    function byJSONLD(){
+      try{
+        for(const s of document.querySelectorAll('script[type="application/ld+json"]')){
+          let j = JSON.parse(s.textContent.trim());
+          if(Array.isArray(j)) j = j.find(o => o && (o['@type']==='JobPosting' || (Array.isArray(o['@type']) && o['@type'].includes('JobPosting'))));
+          if(j){
+            const org = (j.hiringOrganization && (j.hiringOrganization.name||j.hiringOrganization)) || '';
+            let loc = '';
+            if(j.jobLocation){
+              const a = Array.isArray(j.jobLocation)?(j.jobLocation[0]||{}).address:j.jobLocation.address;
+              if(a) loc=[a.addressLocality,a.addressRegion,a.addressCountry].filter(Boolean).join(', ');
+            }
+            if(!loc && j.jobLocationType) loc=j.jobLocationType.replace(/_/g,' ');
+            return {role:clean(j.title), company:clean(org), location:clean(loc), link:j.url||location.href};
+          }
+        }
+      }catch(_){}
+      return null;
+    }
+
+    // ---- Generic selectors ----
+    function bySelectors(){
+      function T(q){ const el=document.querySelector(q); return el?clean(el.textContent):''; }
+      const maps=[
+        {r:'[data-automation-id="jobPostingHeader"] h2, h1[data-automation-id="jobPostingHeader"]', c:'[data-automation-id="companyName"]', l:'[data-automation-id="jobLocation"]'}, // Workday
+        {r:'.posting-headline h1, .posting-headline h2', c:'.posting-company, .logo img[alt]', l:'.location'}, // Lever
+        {r:'h1', c:'header a, .company-name', l:'[data-qa="job-location"], .location'}, // Greenhouse
+        {r:'h1[data-ui="job-title"], h1', c:'[data-ui="company-name"], .job-company', l:'[data-ui="job-location"], .location'} // Workable
+      ];
+      for(const m of maps){
+        const rr=T(m.r), cc=T(m.c), ll=T(m.l);
+        if(rr || cc || ll) return {role:rr, company:cc, location:ll, link:location.href};
+      }
+      return null;
+    }
+
+    // ---- OpenGraph fallback ----
+    function byOG(){
+      const role=(document.querySelector('meta[property="og:title"]')||{}).content||document.title;
+      const site=(document.querySelector('meta[property="og:site_name"]')||{}).content||location.hostname.replace(/^www\\./,'');
+      return {role:clean(role), company:clean(site), location:'', link:location.href};
+    }
+
+    // Prefer LinkedIn adapter on linkedin.com
+    let payload = (location.hostname.includes('linkedin.com') && fromLinkedIn()) || byJSONLD() || bySelectors() || byOG();
+
+    // normalize + minimal prompts if generic
+    if(!payload.company || payload.company.toLowerCase()==='linkedin'){
+      const c = prompt('Company name?', payload.company||'');
+      if(c===null) return; payload.company = c;
+    }
+    if(!payload.role || payload.role.toLowerCase()==='careers'){
+      const r = prompt('Job title?', payload.role||'');
+      if(r===null) return; payload.role = r;
+    }
+
+    // defaults: mark as Applied today; include your resume URL
+    payload.status='Applied';
+    payload.applied = new Date().toISOString().slice(0,10);
+    payload.source = location.host;
+    payload.link = payload.link || location.href;
+    payload.resumeUrl = ${JSON.stringify(state.profile.resumeUrl || '')};
+
+    const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+    const targetUrl = base + '?add=' + encodeURIComponent(b64);
+    let tab = window.__MYJOBS_CAPTURE__ && !window.__MYJOBS_CAPTURE__.closed ? window.__MYJOBS_CAPTURE__ : window.open('', 'MYJOBS_TAB');
+    if(!tab){
+      tab = window.open(targetUrl, 'MYJOBS_TAB');
+    }else{
+      try{
+        if(tab.location && tab.location.href === 'about:blank'){
+          tab.location.href = targetUrl;
+        }else{
+          tab.location.replace(targetUrl);
+        }
+      }catch(_){
+        tab.location.href = targetUrl;
+      }
+    }
+    window.__MYJOBS_CAPTURE__ = tab;
+    try{ tab && tab.focus(); }catch(_){}
+  })();`;
+
+  const href = 'javascript:' + encodeURIComponent(code);
+  const html = `<div style="margin-top:6px"><a class="link" href="${href}">▶ Save to MyJobs (any site — drag to bookmarks)</a></div>`;
+  const container = document.getElementById('bookmarkletArea');
+  if (container) container.innerHTML = html;
+}
+
+
+/* ============================ Export / Import ============================ */
+function exportJSON(){ const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='myjobs_backup.json'; a.click(); }
+function importJSON(){ const f=$('#importFile').files[0]; if(!f) return alert('Choose a file first'); const r=new FileReader(); r.onload=()=>{ try{ state=deepMerge(defaultState, JSON.parse(r.result)); store.set(state); location.reload(); }catch(e){ alert('Invalid JSON'); } }; r.readAsText(f); }
+function exportCSV(){
+  const cols=['role','company','location','status','applied','next','source','link','tags','notes'];
+  const csv=[cols.join(',')].concat(state.applications.map(a=>cols.map(c=>`"${String(c==='tags'?(a[c]||[]).join('|'):a[c]||'').replaceAll('"','""')}"`).join(','))).join('\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download='applications.csv'; a.click();
+}
+
+/* ================================ Boot ================================ */
+function renderAll(){ renderTable(); renderDashboard(); }
+renderAll();
+initColumnFilters();
+setupResumeFilePicker();
+
+document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',()=>{const v=b.dataset.view; $('#toggleViewBtn').textContent=(v==='applications')?'Switch to Kanban':(v==='kanban'?'Switch to Table':'Switch to Kanban');}));
+/* --- Robust URL ingestor: adds ?add=<base64> payload to Applications --- */
+(function ingestFromURL(){
+  try{
+    const u = new URL(window.location.href);
+    const add = u.searchParams.get('add');
+    if (!add) return;
+
+    // decode ?add= (works with encodeURIComponent)
+    let obj = JSON.parse(atob(decodeURIComponent(add)));
+
+    // normalize + defaults
+    obj = {
+      id: (typeof id === 'function' ? id() : 'id_' + Math.random().toString(36).slice(2,9)),
+      role: obj.role || 'Role',
+      company: obj.company || 'Company',
+      location: obj.location || '',
+      status: obj.status || 'Saved',
+      source: obj.source || (location.host || ''),
+      link: obj.link || location.href,
+      resumeUrl: obj.resumeUrl || '',
+      resumeFile: null,
+      applied: obj.applied || '',
+      next: obj.next || '',
+      tags: Array.isArray(obj.tags) ? obj.tags : [],
+      notes: obj.notes || '',
+      created: Date.now()
+    };
+
+    // write to state/localStorage
+    if (typeof state === 'object' && Array.isArray(state.applications)) {
+      state.applications.unshift(obj);
+      if (typeof store === 'object' && typeof store.set === 'function') store.set(state);
+    } else {
+      // fallback if state/store not yet initialized
+      const rawState = (function(){
+        try{ return localStorage.getItem(STORAGE_KEY); }catch(_){ return null; }
+      })() || loadStateFromCookies() || '{}';
+      let st;
+      try{ st = JSON.parse(rawState || '{}'); }catch(_){ st = {}; }
+      st.applications = [obj].concat(st.applications || []);
+      persistSerializedState(JSON.stringify(st));
+    }
+
+    // clean URL so refreshes don't re-add
+    history.replaceState({}, '', u.pathname);
+
+    // quick feedback + rerender if functions exist
+    try { alert('Saved to MyJobs: ' + obj.role + ' @ ' + obj.company); } catch(_) {}
+    try { renderTable && renderTable(); } catch(_) {}
+    try { renderDashboard && renderDashboard(); } catch(_) {}
+    try { renderKanban && renderKanban(); } catch(_) {}
+
+  } catch (e) {
+    console.error('Ingest failed:', e);
+  }
+})();
+function openSavedSearch(id, opts = { open: true, fill: false }) {
+  const s = (state.searches || []).find(x => x.id === id);
+  if (!s) return alert('Saved search not found.');
+
+  // optionally fill the Job Search form
+  if (opts.fill) {
+    const q = document.getElementById('q');
+    const loc = document.getElementById('loc');
+    const sites = document.getElementById('sites');
+    if (q) q.value = s.q || '';
+    if (loc) loc.value = s.loc || '';
+    if (sites && s.sites) {
+      [...sites.options].forEach(o => o.selected = s.sites.includes(o.value));
+    }
+  }
+
+  // open results (current behavior)
+  if (opts.open !== false) {
+    openSites(s.q || '', s.loc || '', s.sites || []);
+  }
+}
+
+</script>
+</body>
+</html>
