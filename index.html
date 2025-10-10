@@ -174,7 +174,7 @@
       <div style="overflow:auto">
         <table id="appsTable"><thead>
           <tr class="header-row">
-            <th data-key="role">Role</th><th data-key="company">Company</th><th data-key="location">Location</th><th data-key="status">Status</th><th data-key="applied">Applied</th><th data-key="next">Next step</th><th data-key="tags">Tags</th><th data-key="actions">Actions</th>
+            <th data-key="role">Role</th><th data-key="company">Company</th><th data-key="location">Location</th><th data-key="status">Status</th><th data-key="applied">Applied</th><th data-key="next">Next step</th><th data-key="source">Source</th><th data-key="tags">Tags</th><th data-key="actions">Actions</th>
           </tr>
           <tr class="filters-row">
             <th data-key="role" class="filter-cell inactive"><input type="text" class="column-filter" data-key="role" placeholder="Filter role"></th>
@@ -328,6 +328,11 @@
         <div class="form">
           <button class="btn ghost" onclick="exportJSON()">Export JSON</button>
           <input id="importFile" type="file" accept=".json"/><button class="btn ghost" onclick="importJSON()">Import JSON</button>
+          <div class="file-picker" style="margin-top:12px">
+            <button class="btn ghost" id="chooseDataFileBtn">Select data file...</button>
+            <button class="btn ghost" id="saveDataFileBtn">Save to selected file</button>
+            <div class="file-name" id="fileSaveStatus"><strong>No file selected.</strong> Choose a destination inside your repository to keep a commit-ready copy.</div>
+          </div>
         </div>
         <hr style="border:none;border-top:1px solid var(--line);margin:14px 0">
         <h3>CSV export (applications)</h3><button class="btn ghost" onclick="exportCSV()">Download CSV</button>
@@ -498,15 +503,129 @@ function clearStoredState(){
   try{ localStorage.removeItem(STORAGE_KEY); }catch(_){ }
   clearStateCookies();
 }
+let fileHandle=null;
+let latestSerializedState=null;
+let fileSaveTimer=null;
+let chooseFileButton=null;
+let saveFileButton=null;
 function persistSerializedState(serialized){
   let ok=true;
   try{ localStorage.setItem(STORAGE_KEY, serialized); }catch(e){ console.warn('localStorage save failed', e); ok=false; }
   saveStateToCookies(serialized);
+  latestSerializedState = serialized;
+  scheduleFileSave();
   return ok;
 }
 
 function formatDate(s){ if(!s) return ''; const d=new Date(s+'T00:00:00'); return d.toLocaleDateString() }
 const $=(s,r=document)=>r.querySelector(s); const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
+const FILE_SAVE_DEBOUNCE_MS = 600;
+const FILE_SAVE_TYPES = [{ description:'MyJobs data', accept:{'application/json':['.json']} }];
+
+function getFileStatusEl(){ return document.getElementById('fileSaveStatus'); }
+function updateFileSaveStatus(message, isError=false){
+  const el=getFileStatusEl();
+  if(!el) return;
+  el.textContent=message;
+  el.style.color=isError?'#b91c1c':'';
+}
+function setFileButtonsState({ connected }){
+  if(saveFileButton) saveFileButton.disabled=!connected;
+}
+function scheduleFileSave(){
+  if(!fileHandle || !latestSerializedState) return;
+  if(fileSaveTimer) clearTimeout(fileSaveTimer);
+  fileSaveTimer=setTimeout(()=>{
+    persistStateToFile(latestSerializedState).catch(err=>console.error('Auto-save failed', err));
+  }, FILE_SAVE_DEBOUNCE_MS);
+}
+async function ensureFilePermission(handle){
+  if(!handle) return false;
+  const opts={mode:'readwrite'};
+  try{
+    if(typeof handle.queryPermission==='function'){
+      if(await handle.queryPermission(opts)==='granted') return true;
+    }
+    if(typeof handle.requestPermission==='function'){
+      if(await handle.requestPermission(opts)==='granted') return true;
+    }
+    return typeof handle.createWritable==='function';
+  }catch(err){
+    console.warn('Permission check failed', err);
+    return false;
+  }
+}
+async function persistStateToFile(serialized, { manual=false }={}){
+  if(!fileHandle || !serialized) return false;
+  updateFileSaveStatus(manual?'Saving to file...':'Auto-saving to file...');
+  try{
+    const permitted=await ensureFilePermission(fileHandle);
+    if(!permitted){
+      fileHandle=null;
+      setFileButtonsState({connected:false});
+      updateFileSaveStatus('File access was revoked. Select the data file again.', true);
+      return false;
+    }
+    const writable=await fileHandle.createWritable();
+    await writable.write(serialized);
+    await writable.close();
+    updateFileSaveStatus(`${manual?'Saved':'Auto-saved'} at ${new Date().toLocaleTimeString()}.`);
+    return true;
+  }catch(err){
+    console.error('File save failed', err);
+    updateFileSaveStatus('File save failed. Select the data file and try again.', true);
+    return false;
+  }
+}
+async function chooseDataFile(){
+  if(typeof window==='undefined' || typeof window.showSaveFilePicker!=='function'){
+    updateFileSaveStatus('Direct file saving is not supported in this browser. Use Export JSON instead.', true);
+    return;
+  }
+  try{
+    const handle=await window.showSaveFilePicker({
+      suggestedName:'myjobs-data.json',
+      types:FILE_SAVE_TYPES
+    });
+    fileHandle=handle;
+    setFileButtonsState({connected:true});
+    if(!latestSerializedState){
+      try{ latestSerializedState=JSON.stringify(state||defaultState); }catch(err){ console.warn('State snapshot failed', err); }
+    }
+    const name=handle && (handle.name || 'myjobs-data.json');
+    updateFileSaveStatus(`Connected to ${name}. Saving...`);
+    if(latestSerializedState) await persistStateToFile(latestSerializedState, {manual:true});
+    else updateFileSaveStatus(`Connected to ${name}.`);
+  }catch(err){
+    if(err && err.name==='AbortError') return;
+    console.error('Selecting data file failed', err);
+    updateFileSaveStatus('Unable to access the selected file. Check permissions and try again.', true);
+  }
+}
+async function manualSaveToFile(){
+  if(!fileHandle){
+    await chooseDataFile();
+    return;
+  }
+  if(!latestSerializedState){
+    try{ latestSerializedState=JSON.stringify(state); }catch(err){ console.warn('State snapshot failed', err); return; }
+  }
+  await persistStateToFile(latestSerializedState, {manual:true});
+}
+function setupFileSyncControls(){
+  chooseFileButton=document.getElementById('chooseDataFileBtn');
+  saveFileButton=document.getElementById('saveDataFileBtn');
+  if(!chooseFileButton || !saveFileButton) return;
+  saveFileButton.disabled=true;
+  if(typeof window==='undefined' || typeof window.showSaveFilePicker!=='function'){
+    chooseFileButton.disabled=true;
+    updateFileSaveStatus('Direct file saving is not supported in this browser. Use Export JSON instead.');
+    return;
+  }
+  chooseFileButton.addEventListener('click',()=>{ chooseDataFile().catch(err=>console.error('Select file failed', err)); });
+  saveFileButton.addEventListener('click',()=>{ manualSaveToFile().catch(err=>console.error('Manual save failed', err)); });
+  updateFileSaveStatus('No file selected. Choose a destination inside your repository to keep a commit-ready copy.');
+}
 
 function ensureApplicationUpgrades(){
   if(!state || !Array.isArray(state.applications)) return;
@@ -1251,6 +1370,7 @@ function renderAll(){ renderTable(); renderDashboard(); }
 renderAll();
 initColumnFilters();
 setupResumeFilePicker();
+setupFileSyncControls();
 
 document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',()=>{const v=b.dataset.view; $('#toggleViewBtn').textContent=(v==='applications')?'Switch to Kanban':(v==='kanban'?'Switch to Table':'Switch to Kanban');}));
 /* --- Robust URL ingestor: adds ?add=<base64> payload to Applications --- */
@@ -1334,3 +1454,5 @@ function openSavedSearch(id, opts = { open: true, fill: false }) {
 </script>
 </body>
 </html>
+
+
