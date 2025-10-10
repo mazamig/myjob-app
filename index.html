@@ -508,12 +508,17 @@ let latestSerializedState=null;
 let fileSaveTimer=null;
 let chooseFileButton=null;
 let saveFileButton=null;
+let skipNextAutoSave=false;
 function persistSerializedState(serialized){
   let ok=true;
   try{ localStorage.setItem(STORAGE_KEY, serialized); }catch(e){ console.warn('localStorage save failed', e); ok=false; }
   saveStateToCookies(serialized);
   latestSerializedState = serialized;
-  scheduleFileSave();
+  if(skipNextAutoSave){
+    skipNextAutoSave=false;
+  }else{
+    scheduleFileSave();
+  }
   return ok;
 }
 
@@ -589,13 +594,50 @@ async function chooseDataFile(){
     });
     fileHandle=handle;
     setFileButtonsState({connected:true});
+    const name=handle && (handle.name || 'myjobs-data.json');
+    let loaded=false;
+    if(handle && typeof handle.getFile==='function'){
+      try{
+        updateFileSaveStatus(`Connected to ${name}. Loading saved data...`);
+        const file=await handle.getFile();
+        const textContent=await file.text();
+        if(textContent && textContent.trim()){
+          const parsed=JSON.parse(textContent);
+          const merged=deepMerge(defaultState, parsed||{});
+          if((merged?._v||0)!==APP_VERSION) merged._v = APP_VERSION;
+          skipNextAutoSave=true;
+          state=merged;
+          ensureApplicationUpgrades();
+          skipNextAutoSave=true;
+          store.set(state);
+          latestSerializedState=JSON.stringify(state);
+          try{
+            renderAll();
+            if(typeof renderKanban==='function') renderKanban();
+            if(typeof renderSavedSearches==='function') renderSavedSearches();
+            if(typeof loadPrefForm==='function') loadPrefForm();
+            if(typeof loadProfileForms==='function') loadProfileForms();
+            if(typeof loadEEOForm==='function') loadEEOForm();
+          }catch(uiErr){
+            console.warn('UI refresh failed', uiErr);
+          }
+          loaded=true;
+        }
+      }catch(readErr){
+        console.error('Reading data file failed', readErr);
+        updateFileSaveStatus('Connected but unable to read the data file. Validate the JSON and try again.', true);
+        return;
+      }
+    }
     if(!latestSerializedState){
       try{ latestSerializedState=JSON.stringify(state||defaultState); }catch(err){ console.warn('State snapshot failed', err); }
     }
-    const name=handle && (handle.name || 'myjobs-data.json');
-    updateFileSaveStatus(`Connected to ${name}. Saving...`);
-    if(latestSerializedState) await persistStateToFile(latestSerializedState, {manual:true});
-    else updateFileSaveStatus(`Connected to ${name}.`);
+    if(loaded){
+      updateFileSaveStatus(`Connected to ${name}. Loaded saved data. Auto-save is enabled.`);
+    }else{
+      updateFileSaveStatus(`Connected to ${name}. Auto-save is enabled.`);
+      if(latestSerializedState) await persistStateToFile(latestSerializedState, {manual:true});
+    }
   }catch(err){
     if(err && err.name==='AbortError') return;
     console.error('Selecting data file failed', err);
