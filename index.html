@@ -333,6 +333,13 @@
             <button class="btn ghost" id="saveDataFileBtn">Save to selected file</button>
             <div class="file-name" id="fileSaveStatus"><strong>No file selected.</strong> Choose a destination inside your repository to keep a commit-ready copy.</div>
           </div>
+          <hr style="border:none;border-top:1px solid var(--line);margin:14px 0">
+          <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px">
+            <span style="display:block;font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:4px">Import from URL (read-only)</span>
+            <input id="remoteDataUrl" placeholder="https://example.com/myjobs-data.json" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;">
+          </label>
+          <button class="btn ghost" id="loadRemoteDataBtn">Load JSON from URL</button>
+          <div class="file-name" id="remoteLoadStatus"></div>
         </div>
         <hr style="border:none;border-top:1px solid var(--line);margin:14px 0">
         <h3>CSV export (applications)</h3><button class="btn ghost" onclick="exportCSV()">Download CSV</button>
@@ -340,6 +347,38 @@
       <div class="card">
         <h3>Danger zone</h3>
         <button class="btn" style="background:#fee2e2;color:#7f1d1d" onclick="if(confirm('Clear ALL data?')){clearStoredState();location.reload()}">Clear all data</button>
+      </div>
+      <div class="card">
+        <h3>GitHub sync</h3>
+        <div class="form">
+          <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px">
+            <span style="display:block;font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:4px">Repository owner</span>
+            <input id="ghOwner" placeholder="GitHub username or org" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;">
+          </label>
+          <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px">
+            <span style="display:block;font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:4px">Repository name</span>
+            <input id="ghRepo" placeholder="myjob-app" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;">
+          </label>
+          <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px">
+            <span style="display:block;font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:4px">Branch</span>
+            <input id="ghBranch" placeholder="main" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;">
+          </label>
+          <label style="display:block;font-size:12px;color:var(--muted);margin-bottom:6px">
+            <span style="display:block;font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:4px">Personal access token (stored locally)</span>
+            <input id="ghToken" type="password" placeholder="ghp_xxx" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;">
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin:12px 0">
+            <input type="checkbox" id="ghAutoUpload">
+            <span>Auto-upload to GitHub whenever data changes</span>
+          </label>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn ghost" id="ghTestBtn">Test connection</button>
+            <button class="btn ghost" id="ghUploadBtn">Upload now</button>
+          </div>
+          <div class="file-name" id="ghStatus" style="margin-top:8px"></div>
+          <div class="file-name" style="margin-top:4px"><strong>Target file:</strong> myjob-nginx/myjobs_backup.json</div>
+          <p class="help" style="margin-top:10px">Tip: create a fine-grained token with <b>Contents: Read &amp; Write</b> on the repo. The token never leaves this browser, but anyone with access to the device could read it.</p>
+        </div>
       </div>
     </section>
   </main>
@@ -509,6 +548,10 @@ let fileSaveTimer=null;
 let chooseFileButton=null;
 let saveFileButton=null;
 let skipNextAutoSave=false;
+let remoteLoadButton=null;
+let remoteUrlInput=null;
+let ghConfig=null;
+let ghUploadTimer=null;
 function persistSerializedState(serialized){
   let ok=true;
   try{ localStorage.setItem(STORAGE_KEY, serialized); }catch(e){ console.warn('localStorage save failed', e); ok=false; }
@@ -518,6 +561,7 @@ function persistSerializedState(serialized){
     skipNextAutoSave=false;
   }else{
     scheduleFileSave();
+    scheduleGitHubUpload();
   }
   return ok;
 }
@@ -526,6 +570,11 @@ function formatDate(s){ if(!s) return ''; const d=new Date(s+'T00:00:00'); retur
 const $=(s,r=document)=>r.querySelector(s); const $$=(s,r=document)=>Array.from(r.querySelectorAll(s));
 const FILE_SAVE_DEBOUNCE_MS = 600;
 const FILE_SAVE_TYPES = [{ description:'MyJobs data', accept:{'application/json':['.json']} }];
+const DEFAULT_REMOTE_DATA_URL = './myjobs_backup.json';
+const AUTO_REMOTE_IMPORT_MAX_APPS = 1;
+const GITHUB_CONFIG_KEY = 'MYJOBS_GITHUB_SYNC';
+const GITHUB_UPLOAD_DEBOUNCE_MS = 1500;
+const GITHUB_DATA_PATH = 'myjob-nginx/myjobs_backup.json';
 
 function getFileStatusEl(){ return document.getElementById('fileSaveStatus'); }
 function updateFileSaveStatus(message, isError=false){
@@ -543,6 +592,14 @@ function scheduleFileSave(){
   fileSaveTimer=setTimeout(()=>{
     persistStateToFile(latestSerializedState).catch(err=>console.error('Auto-save failed', err));
   }, FILE_SAVE_DEBOUNCE_MS);
+}
+function scheduleGitHubUpload(){
+  if(!ghConfig || !ghConfig.autoUpload) return;
+  if(!ghConfig.token || !ghConfig.owner || !ghConfig.repo) return;
+  if(ghUploadTimer) clearTimeout(ghUploadTimer);
+  ghUploadTimer=setTimeout(()=>{
+    uploadDataToGitHub({silent:true}).catch(err=>console.error('Auto GitHub upload failed', err));
+  }, GITHUB_UPLOAD_DEBOUNCE_MS);
 }
 async function ensureFilePermission(handle){
   if(!handle) return false;
@@ -667,6 +724,243 @@ function setupFileSyncControls(){
   chooseFileButton.addEventListener('click',()=>{ chooseDataFile().catch(err=>console.error('Select file failed', err)); });
   saveFileButton.addEventListener('click',()=>{ manualSaveToFile().catch(err=>console.error('Manual save failed', err)); });
   updateFileSaveStatus('No file selected. Choose a destination inside your repository to keep a commit-ready copy.');
+}
+function getRemoteStatusEl(){ return document.getElementById('remoteLoadStatus'); }
+function updateRemoteStatus(message, isError=false){
+  const el=getRemoteStatusEl();
+  if(!el) return;
+  el.textContent=message||'';
+  el.style.color=isError?'#b91c1c':'';
+}
+async function loadRemoteData(url,{silent=false}={}){
+  const target=(url||'').trim() || DEFAULT_REMOTE_DATA_URL;
+  if(!target){
+    if(!silent) updateRemoteStatus('Enter a valid JSON URL.', true);
+    return false;
+  }
+  if(typeof fetch!=='function'){
+    if(!silent) updateRemoteStatus('This browser does not support remote loading. Use the desktop app or Export JSON instead.', true);
+    return false;
+  }
+  if(!silent) updateRemoteStatus('Loading data from URL...');
+  try{
+    const res=await fetch(target,{cache:'no-store'});
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const payload=await res.json();
+    const merged=deepMerge(defaultState, payload||{});
+    skipNextAutoSave=true;
+    state=merged;
+    ensureApplicationUpgrades();
+    skipNextAutoSave=true;
+    latestSerializedState=JSON.stringify(state);
+    store.set(state);
+    renderAll();
+    try{ if(typeof renderKanban==='function') renderKanban(); }catch(_){}
+    try{ if(typeof renderSavedSearches==='function') renderSavedSearches(); }catch(_){}
+    try{ if(typeof loadPrefForm==='function') loadPrefForm(); }catch(_){}
+    try{ if(typeof loadProfileForms==='function') loadProfileForms(); }catch(_){}
+    try{ if(typeof loadEEOForm==='function') loadEEOForm(); }catch(_){}
+    if(!silent){
+      updateRemoteStatus(`Loaded ${state.applications.length} application${state.applications.length===1?'':'s'} from ${target}.`);
+    }
+    return true;
+  }catch(err){
+    console.error('Remote data load failed', err);
+    if(!silent) updateRemoteStatus('Unable to load data from that URL. Check CORS, the file path, and JSON validity.', true);
+    return false;
+  }
+}
+function setupRemoteImportControls(){
+  remoteLoadButton=document.getElementById('loadRemoteDataBtn');
+  remoteUrlInput=document.getElementById('remoteDataUrl');
+  if(remoteUrlInput && !remoteUrlInput.value && DEFAULT_REMOTE_DATA_URL){
+    remoteUrlInput.value=DEFAULT_REMOTE_DATA_URL;
+  }
+  if(remoteLoadButton){
+    remoteLoadButton.addEventListener('click',()=>{
+      const url=remoteUrlInput ? remoteUrlInput.value : DEFAULT_REMOTE_DATA_URL;
+      loadRemoteData(url,{silent:false}).catch(err=>console.error('Remote load failed', err));
+    });
+  }
+  const statusEl=getRemoteStatusEl();
+  if(statusEl && DEFAULT_REMOTE_DATA_URL){
+    statusEl.textContent=`Tip: host ${DEFAULT_REMOTE_DATA_URL} alongside this page to preload data on phones.`;
+  }
+}
+async function attemptAutoRemoteImport(){
+  try{
+    if(!DEFAULT_REMOTE_DATA_URL) return;
+    if(typeof fetch!=='function') return;
+    const existingCount=Array.isArray(state?.applications)?state.applications.length:0;
+    if(existingCount>AUTO_REMOTE_IMPORT_MAX_APPS) return;
+    await loadRemoteData(DEFAULT_REMOTE_DATA_URL,{silent:true});
+  }catch(err){
+    console.warn('Auto remote import skipped', err);
+  }
+}
+function loadGitHubConfig(){
+  if(ghConfig) return ghConfig;
+  let raw=null;
+  try{ raw=localStorage.getItem(GITHUB_CONFIG_KEY); }catch(_){}
+  const defaults={owner:'',repo:'',branch:'main',token:'',autoUpload:false,lastSha:null};
+  if(raw){
+    try{
+      const parsed=JSON.parse(raw);
+      ghConfig={...defaults,...parsed};
+    }catch(_){
+      ghConfig={...defaults};
+    }
+  }else{
+    ghConfig={...defaults};
+  }
+  ghConfig.path = GITHUB_DATA_PATH;
+  return ghConfig;
+}
+function persistGitHubConfig(){
+  if(!ghConfig) return;
+  const {path,...rest}=ghConfig;
+  try{ localStorage.setItem(GITHUB_CONFIG_KEY, JSON.stringify(rest)); }catch(err){ console.warn('Failed to store GitHub config', err); }
+}
+function getGitHubStatusEl(){ return document.getElementById('ghStatus'); }
+function updateGitHubStatus(message, isError=false){
+  const el=getGitHubStatusEl();
+  if(!el) return;
+  el.textContent=message||'';
+  el.style.color=isError?'#b91c1c':'';
+}
+function encodeContentForGitHub(json){
+  return btoa(unescape(encodeURIComponent(json)));
+}
+function githubEncodePath(path){
+  return (path||'').split('/').map(encodeURIComponent).join('/');
+}
+async function fetchGitHubSha(config){
+  const encodedPath=githubEncodePath(GITHUB_DATA_PATH);
+  const url=`https://api.github.com/repos/${encodeURIComponent(config.owner)}/${encodeURIComponent(config.repo)}/contents/${encodedPath}${config.branch?`?ref=${encodeURIComponent(config.branch)}`:''}`;
+  const res=await fetch(url,{
+    headers:{
+      'Accept':'application/vnd.github+json',
+      'Authorization':`Bearer ${config.token}`
+    }
+  });
+  if(res.status===404) return null;
+  if(res.status===401 || res.status===403) throw new Error('Unauthorized (check token scopes and repo access)');
+  if(!res.ok) throw new Error(`GitHub API error ${res.status}`);
+  const data=await res.json();
+  return data && data.sha ? data.sha : null;
+}
+async function uploadDataToGitHub({manual=false,silent=false,testOnly=false}={}){
+  try{
+    const cfg=loadGitHubConfig();
+    if(!cfg.owner || !cfg.repo || !cfg.token){
+      if(!silent) updateGitHubStatus(`Set owner, repo, and token before uploading to ${GITHUB_DATA_PATH}.`, true);
+      return false;
+    }
+    const branch=cfg.branch || 'main';
+    if(!silent) updateGitHubStatus(testOnly?`Testing connection to ${cfg.owner}/${cfg.repo}/${GITHUB_DATA_PATH}...`:`Uploading data to ${cfg.owner}/${cfg.repo}/${GITHUB_DATA_PATH}...`);
+    const contentJson = JSON.stringify(state, null, 2);
+    let sha=cfg.lastSha||null;
+    if(!sha || testOnly){
+      sha=await fetchGitHubSha(cfg);
+      if(sha) cfg.lastSha=sha;
+      persistGitHubConfig();
+      if(testOnly){
+        updateGitHubStatus(sha ? `Connection OK. ${GITHUB_DATA_PATH} exists and is writable.` : `Connection OK. ${GITHUB_DATA_PATH} not found; it will be created on first upload.`);
+        return true;
+      }
+    }
+    const payload={
+      message:`Update MyJobs data (${new Date().toISOString()})`,
+      content:encodeContentForGitHub(contentJson),
+      branch
+    };
+    if(sha) payload.sha=sha;
+    const encodedPath=githubEncodePath(GITHUB_DATA_PATH);
+    const url=`https://api.github.com/repos/${encodeURIComponent(cfg.owner)}/${encodeURIComponent(cfg.repo)}/contents/${encodedPath}`;
+    const res=await fetch(url,{
+      method:'PUT',
+      headers:{
+        'Accept':'application/vnd.github+json',
+        'Authorization':`Bearer ${cfg.token}`,
+        'Content-Type':'application/json'
+      },
+      body:JSON.stringify(payload)
+    });
+    if(res.status===401 || res.status===403) throw new Error('Unauthorized (check token scopes and repo access)');
+    if(!res.ok){
+      const errText=await res.text();
+      throw new Error(`GitHub upload failed (${res.status}): ${errText}`);
+    }
+    const data=await res.json();
+    if(data && data.content && data.content.sha){
+      cfg.lastSha=data.content.sha;
+      persistGitHubConfig();
+    }
+    if(!silent){
+      updateGitHubStatus(`Uploaded ${Math.round(contentJson.length/1024)} KB to ${cfg.owner}/${cfg.repo}/${GITHUB_DATA_PATH} at ${new Date().toLocaleTimeString()}.`);
+    }
+    return true;
+  }catch(err){
+    console.error('GitHub upload error', err);
+    if(!silent){
+      updateGitHubStatus(err.message || 'GitHub upload failed.', true);
+    }
+    return false;
+  }
+}
+function setupGitHubSyncControls(){
+  loadGitHubConfig();
+  const ownerInput=document.getElementById('ghOwner');
+  const repoInput=document.getElementById('ghRepo');
+  const branchInput=document.getElementById('ghBranch');
+  const tokenInput=document.getElementById('ghToken');
+  const autoCheckbox=document.getElementById('ghAutoUpload');
+  const testBtn=document.getElementById('ghTestBtn');
+  const uploadBtn=document.getElementById('ghUploadBtn');
+  if(!ownerInput || !repoInput || !branchInput || !tokenInput || !autoCheckbox) return;
+  ownerInput.value=ghConfig.owner||'';
+  repoInput.value=ghConfig.repo||'';
+  branchInput.value=ghConfig.branch||'';
+  tokenInput.value=ghConfig.token||'';
+  autoCheckbox.checked=!!ghConfig.autoUpload;
+  const persist=()=>{
+    ghConfig.owner=ownerInput.value.trim();
+    ghConfig.repo=repoInput.value.trim();
+    ghConfig.branch=branchInput.value.trim() || 'main';
+    ghConfig.token=tokenInput.value.trim();
+    ghConfig.autoUpload=autoCheckbox.checked;
+    persistGitHubConfig();
+  };
+  [ownerInput,repoInput,branchInput,tokenInput].forEach(input=>{
+    input.addEventListener('change',persist);
+    input.addEventListener('blur',persist);
+  });
+  autoCheckbox.addEventListener('change',()=>{
+    persist();
+    if(ghConfig.autoUpload){
+      scheduleGitHubUpload();
+      updateGitHubStatus(`Auto-upload enabled. Target: ${GITHUB_DATA_PATH}`);
+    }else{
+      updateGitHubStatus(`Auto-upload disabled. Uploads target ${GITHUB_DATA_PATH}.`);
+    }
+  });
+  if(testBtn){
+    testBtn.addEventListener('click',()=>{
+      persist();
+      uploadDataToGitHub({testOnly:true}).catch(err=>console.error('GitHub test failed', err));
+    });
+  }
+  if(uploadBtn){
+    uploadBtn.addEventListener('click',()=>{
+      persist();
+      uploadDataToGitHub({manual:true}).catch(err=>console.error('GitHub upload failed', err));
+    });
+  }
+  if(ghConfig.autoUpload){
+    updateGitHubStatus(`Auto-upload enabled. Target: ${GITHUB_DATA_PATH}`);
+  }else{
+    updateGitHubStatus(`Ready to sync ${GITHUB_DATA_PATH}. Configure repo details and click Upload.`);
+  }
 }
 
 function ensureApplicationUpgrades(){
@@ -1413,6 +1707,9 @@ renderAll();
 initColumnFilters();
 setupResumeFilePicker();
 setupFileSyncControls();
+setupGitHubSyncControls();
+setupRemoteImportControls();
+attemptAutoRemoteImport();
 
 document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',()=>{const v=b.dataset.view; $('#toggleViewBtn').textContent=(v==='applications')?'Switch to Kanban':(v==='kanban'?'Switch to Table':'Switch to Kanban');}));
 /* --- Robust URL ingestor: adds ?add=<base64> payload to Applications --- */
