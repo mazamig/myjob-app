@@ -42,13 +42,12 @@
   .portal-link strong{font-size:14px;color:var(--brand-2)}
   .portal-link span{font-size:12px;color:var(--muted)}
   .portal-link:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(16,75,75,.12)}
-  .portal-controls{margin-top:12px}
-  .portal-controls .btn.small{padding:6px 12px}
-  .portal-choices{display:none;margin-top:10px;padding:10px;border:1px solid var(--line);border-radius:10px;background:#f8fcfb;box-shadow:inset 0 1px 3px rgba(16,75,75,.08);max-height:220px;overflow:auto}
-  .portal-choices.active{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:8px}
-  .portal-choices label{display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--ink-2)}
-  .portal-choices label div{display:flex;flex-direction:column;gap:2px}
-  .portal-choices label span{font-size:11px;color:var(--muted)}
+  .portal-link.disabled{cursor:not-allowed;pointer-events:none;opacity:.6}
+  .pin-toggle{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-right:10px}
+  .pin-toggle input{margin:0}
+  .actions-cell{white-space:nowrap}
+  .actions-cell .action-content{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .actions-cell .action-links{display:inline-flex;gap:6px;flex-wrap:wrap}
   .grid{display:grid;gap:16px}
   .filters{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end}
   .filters label{font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
@@ -145,12 +144,9 @@
       </div>
       <div class="card">
         <h3>Company portals</h3>
-        <p class="help">Jump straight into major employer career sites.</p>
+        <p class="help">Pin applications to build a quick list of job links you revisit often.</p>
         <div id="majorPortals" class="portals-list"></div>
-        <div class="portal-controls">
-          <button class="btn ghost small" type="button" id="customizePortalsBtn">Customize list</button>
-          <div id="portalChoices" class="portal-choices"></div>
-        </div>
+        <p class="help" style="font-size:12px;margin-top:8px">Manage pins from the Applications view or when editing a job.</p>
       </div>
       <div class="card">
         <h3>Automation links</h3>
@@ -437,6 +433,7 @@
     </div>
     <div><label>Tags</label><input name="tags" placeholder="comma,separated"></div>
     <label>Notes</label><textarea name="notes" rows="3" placeholder="Recruiter, pay range, reminders…"></textarea>
+    <label class="pin-toggle" style="margin-top:12px"><input type="checkbox" name="pinned">Show in Company portals quick links</label>
     <div style="display:flex;gap:10px;justify-content:flex-end">
       <button class="btn ghost" type="button" onclick="closeModal()">Cancel</button>
       <button class="btn primary" type="submit">Save</button>
@@ -480,20 +477,8 @@ const defaultState = {
   },
   prefs:{languages:"English", employment:["Full-time"], worksites:["On-site","Hybrid","Remote"], locations:"Independence OH; Orlando FL; Vancouver WA", relocate:true},
   searches:[{id:id(), name:"Battery / Ohio", q:"Battery Test Engineer OR Cell Testing", loc:"Ohio", sites:["Google Jobs","LinkedIn","Indeed"], created:Date.now()}],
-  applications:[{id:id(), role:"Cell Testing Engineer", company:"Gotion, Inc.", location:"Independence, OH", status:"Applied", applied:today(), next:"", source:"Greenhouse", link:"", resumeUrl:'', resumeFile:null, tags:["Battery","Testing"], notes:"Submitted via Greenhouse.", created:Date.now()}]
+  applications:[{id:id(), role:"Cell Testing Engineer", company:"Gotion, Inc.", location:"Independence, OH", status:"Applied", applied:today(), next:"", source:"Greenhouse", link:"", resumeUrl:'', resumeFile:null, tags:["Battery","Testing"], notes:"Submitted via Greenhouse.", pinned:false, created:Date.now()}]
 };
-const MAJOR_PORTALS = [
-  { id:'toyota', name:'Toyota Careers', url:'https://careers.toyota.com/', note:'Manufacturing, engineering, and corporate roles' },
-  { id:'siemens', name:'Siemens Jobs & Careers', url:'https://jobs.siemens.com/', note:'Automation, energy, and healthcare opportunities' },
-  { id:'bosch', name:'Bosch Careers', url:'https://www.bosch.us/careers/', note:'Mobility, industrial technology, and R&D positions' },
-  { id:'gm', name:'General Motors Careers', url:'https://search-careers.gm.com/', note:'Electrification, manufacturing, and business paths' },
-  { id:'tesla', name:'Tesla Careers', url:'https://www.tesla.com/careers', note:'EV, energy, and operations roles worldwide' },
-  { id:'amazon', name:'Amazon Jobs', url:'https://www.amazon.jobs/', note:'Corporate, operations, AWS, and robotics roles' },
-  { id:'microsoft', name:'Microsoft Careers', url:'https://careers.microsoft.com/', note:'Software, cloud, hardware, and product teams' },
-  { id:'samsung', name:'Samsung Careers', url:'https://www.samsungcareers.com/global?cmd=homeView', note:'Semiconductor, consumer electronics, and software' }
-];
-const PORTAL_CONFIG_KEY = 'MYJOBS_PORTAL_CHOICES';
-let portalSelections = MAJOR_PORTALS.map(p=>p.id);
 
 // ---------- Helpers ----------
 function id(){ return 'id_'+Math.random().toString(36).slice(2,9) }
@@ -1000,9 +985,15 @@ function ensureApplicationUpgrades(){
   if(!state || !Array.isArray(state.applications)) return;
   let updated=false;
   state.applications=state.applications.map(app=>{
-    if(app && typeof app==='object' && app.resumeFile===undefined){
-      app.resumeFile=null;
-      updated=true;
+    if(app && typeof app==='object'){
+      if(app.resumeFile===undefined){
+        app.resumeFile=null;
+        updated=true;
+      }
+      if(app.pinned===undefined){
+        app.pinned=false;
+        updated=true;
+      }
     }
     return app;
   });
@@ -1105,78 +1096,29 @@ if(clearFiltersBtn) clearFiltersBtn.addEventListener('click',()=>{
   renderTable();
 });
 
-function loadPortalSelections(){
-  try{
-    const raw = localStorage.getItem(PORTAL_CONFIG_KEY);
-    if(raw!==null){
-      const parsed = JSON.parse(raw);
-      if(Array.isArray(parsed)){
-        return parsed.filter(id => MAJOR_PORTALS.some(p=>p.id===id));
-      }
-      return [];
-    }
-  }catch(err){
-    console.warn('Portal selections load failed', err);
-  }
-  return MAJOR_PORTALS.map(p=>p.id);
-}
-
-function savePortalSelections(selection){
-  portalSelections = Array.isArray(selection) ? [...selection] : [];
-  try{
-    localStorage.setItem(PORTAL_CONFIG_KEY, JSON.stringify(portalSelections));
-  }catch(err){
-    console.warn('Portal selections save failed', err);
-  }
-  renderMajorPortals();
-}
-
-function setupPortalControls(){
-  const button=$('#customizePortalsBtn');
-  const choices=$('#portalChoices');
-  if(!button || !choices) return;
-  portalSelections = loadPortalSelections();
-  const selectedSet=new Set(portalSelections);
-  choices.innerHTML=MAJOR_PORTALS.map(({id,name,note})=>`
-    <label>
-      <input type="checkbox" value="${id}">
-      <div><strong>${name}</strong>${note?`<span>${note}</span>`:''}</div>
-    </label>
-  `).join('');
-  const checkboxes=choices.querySelectorAll('input[type="checkbox"]');
-  checkboxes.forEach(cb=>{
-    cb.checked = selectedSet.size ? selectedSet.has(cb.value) : false;
-    cb.addEventListener('change',()=>{
-      const checked = Array.from(choices.querySelectorAll('input[type="checkbox"]:checked')).map(x=>x.value);
-      savePortalSelections(checked);
-    });
-  });
-  button.addEventListener('click',()=>{
-    const active=choices.classList.toggle('active');
-    button.textContent=active?'Done customizing':'Customize list';
-  });
-  renderMajorPortals();
-}
-
 function renderMajorPortals(){
   const container=$('#majorPortals');
   if(!container) return;
-  if(!Array.isArray(MAJOR_PORTALS) || !MAJOR_PORTALS.length){
-    container.innerHTML='<span class="muted">Add your favorite portals to the config.</span>';
+  const pinned = state.applications.filter(app=>app && app.pinned);
+  if(!pinned.length){
+    container.innerHTML='<span class="muted">No pinned applications yet. Use "Quick link" on an application to show it here.</span>';
     return;
   }
-  const activeIds = Array.isArray(portalSelections) ? portalSelections : [];
-  const items = activeIds.length ? MAJOR_PORTALS.filter(p=>activeIds.includes(p.id)) : [];
-  if(!items.length){
-    container.innerHTML='<span class="muted">No companies selected. Use “Customize list” below to add portals.</span>';
-    return;
-  }
-  container.innerHTML=items.map(({name,url,note})=>`
-    <a class="portal-link" href="${url}" target="_blank" rel="noopener">
-      <strong>${name}</strong>
-      <span>${note||''}</span>
-    </a>
-  `).join('');
+  container.innerHTML=pinned.map(app=>{
+    const hasLink = Boolean((app.link||'').trim());
+    const href = hasLink ? app.link : '#';
+    const company = app.company || app.role || 'Job';
+    const role = app.role || '';
+    const location = app.location || '';
+    const detailParts = [role, location].filter(Boolean);
+    const detail = detailParts.length ? detailParts.join(' • ') : (hasLink ? app.link : 'Add a job link to enable quick access.');
+    const attrs = hasLink ? `href="${href}" target="_blank" rel="noopener"` : 'href="#" onclick="return false"';
+    const disabledClass = hasLink ? '' : ' disabled';
+    return `<a class="portal-link${disabledClass}" ${attrs}>
+      <strong>${company}</strong>
+      <span>${detail}</span>
+    </a>`;
+  }).join('');
 }
 
 /* ============================== Dashboard ============================== */
@@ -1396,9 +1338,9 @@ function renderTable(){
       if(a.link) actionLinks.push(`<a href="${a.link}" target="_blank">Job</a>`);
       if(a.resumeUrl) actionLinks.push(`<a href="${resumeHref(a.resumeUrl)}" target="_blank">Resume link</a>`);
       if(a.resumeFile && a.resumeFile.data) actionLinks.push(`<a href="${a.resumeFile.data}" download="${a.resumeFile.name||'resume'}">Resume file</a>`);
-      const actionsHTML=actionLinks.join(' | ');
-      const buttonsHTML=`<button class="btn ghost" onclick='editApp("${a.id}")'>Edit</button> | <button class="btn" style="background:#fff0f3;border:1px solid #ffd6df;color:#b91c1c" onclick='delApp("${a.id}")'>Delete</button>`;
-      const prefix=actionsHTML ? actionsHTML + ' | ' : '';
+      const pinnedToggle=`<label class="pin-toggle"><input type="checkbox" ${a.pinned?'checked':''} onchange="togglePinnedApp('${a.id}', this.checked)">Quick link</label>`;
+      const jobLinksHTML=actionLinks.length ? `<span class="action-links">${actionLinks.join(' | ')}</span>` : '';
+      const buttonsHTML=`<span class="action-links action-buttons"><button class="btn ghost" type="button" onclick='editApp("${a.id}")'>Edit</button><button class="btn small danger" type="button" onclick='delApp("${a.id}")'>Delete</button></span>`;
       return `<tr>
       <td><a class="link" href="${a.link||'#'}" target="_blank">${a.role||''}</a></td>
       <td>${a.company||''}</td>
@@ -1408,8 +1350,12 @@ function renderTable(){
       <td>${formatDate(a.next)}</td>
       <td>${a.source||''}</td>
       <td>${(a.tags||[]).map(t=>`<span class="tag">${t}</span>`).join('')}</td>
-      <td style="white-space:nowrap">
-       ${prefix}${buttonsHTML}
+      <td class="actions-cell">
+        <div class="action-content">
+          ${pinnedToggle}
+          ${jobLinksHTML}
+          ${buttonsHTML}
+        </div>
      </td>
 
     </tr>`;
@@ -1427,6 +1373,13 @@ function resumeHref(v){
 
 function editApp(id){ openModal(state.applications.find(x=>x.id===id)); }
 function delApp(id){ if(!confirm('Delete this application?'))return; state.applications=state.applications.filter(x=>x.id!==id); store.set(state); renderTable(); renderKanban(); renderDashboard(); }
+function togglePinnedApp(id, checked){
+  const app=state.applications.find(x=>x.id===id);
+  if(!app) return;
+  app.pinned=Boolean(checked);
+  try{ store.set(state); }catch(_){}
+  renderMajorPortals();
+}
 
 
 /* ============================== Kanban ============================== */
@@ -1448,8 +1401,21 @@ function onDrop(e){ const id=e.dataTransfer.getData('text/plain'); const col=e.c
 function openModal(existing=null){
   $('#modalTitle').textContent=existing?'Edit application':'Add application';
   const f=$('#appForm'); f.reset();
-  if(existing){ Object.entries(existing).forEach(([k,v])=>{ if(f[k]!==undefined) f[k].value=Array.isArray(v)?v.join(','):(v||''); }); }
-  else{ f.id.value=''; f.applied.value=''; f.next.value=''; }
+  if(existing){
+    Object.entries(existing).forEach(([k,v])=>{
+      if(f[k]===undefined) return;
+      if(f[k].type==='checkbox'){
+        f[k].checked=Boolean(v);
+      }else{
+        f[k].value=Array.isArray(v)?v.join(','):(v||'');
+      }
+    });
+  }else{
+    f.id.value='';
+    f.applied.value='';
+    f.next.value='';
+    if(f.pinned) f.pinned.checked=false;
+  }
   currentResumeFile = existing && existing.resumeFile ? { ...existing.resumeFile } : null;
   const resumeInput=$('#resumeFileInput'); if(resumeInput) resumeInput.value='';
   updateResumeFileUI();
@@ -1468,6 +1434,7 @@ function saveApplication(e){
   const obj={ id:f.id.value||id(), role:f.role.value.trim(), company:f.company.value.trim(), location:f.location.value.trim(),
     status:f.status.value, applied:f.applied.value, next:f.next.value, source:f.source.value.trim(), link:f.link.value.trim(),
     resumeUrl:f.resumeUrl.value.trim(), tags:(f.tags.value||'').split(',').map(s=>s.trim()).filter(Boolean), notes:f.notes.value.trim(),
+    pinned:f.pinned?Boolean(f.pinned.checked):false,
     created: existing && existing.created ? existing.created : Date.now() };
   obj.resumeFile = currentResumeFile ? { ...currentResumeFile } : null;
   if(existingIndex>=0) state.applications[existingIndex]=obj; else state.applications.unshift(obj);
@@ -1508,7 +1475,7 @@ function addFromSearch(e){
   e.preventDefault();
   const a={ id:id(), role:$('#sRole').value.trim(), company:$('#sCompany').value.trim(), location:$('#sLocation').value.trim(),
     status:$('#sStatus').value, applied:'', next:'', source:$('#sSource').value.trim(), link:$('#sLink').value.trim(),
-    resumeUrl:'', resumeFile:null, tags:[], notes:$('#sNotes').value.trim(), created:Date.now() };
+    resumeUrl:'', resumeFile:null, tags:[], notes:$('#sNotes').value.trim(), pinned:false, created:Date.now() };
   state.applications.unshift(a); store.set(state); ui.go('applications'); renderTable(); renderKanban(); renderDashboard(); e.target.reset(); return false;
 }
 
@@ -1811,13 +1778,11 @@ function exportCSV(){
 
 /* ================================ Boot ================================ */
 function renderAll(){ renderTable(); renderDashboard(); }
-portalSelections = loadPortalSelections();
 renderAll();
 initColumnFilters();
 setupResumeFilePicker();
 setupFileSyncControls();
 setupGitHubSyncControls();
-setupPortalControls();
 setupRemoteImportControls();
 attemptAutoRemoteImport();
 
@@ -1847,6 +1812,7 @@ document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',()=>
       next: obj.next || '',
       tags: Array.isArray(obj.tags) ? obj.tags : [],
       notes: obj.notes || '',
+      pinned: false,
       created: Date.now()
     };
 
@@ -1903,5 +1869,4 @@ function openSavedSearch(id, opts = { open: true, fill: false }) {
 </script>
 </body>
 </html>
-
 
